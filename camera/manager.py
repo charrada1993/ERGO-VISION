@@ -97,6 +97,15 @@ class CameraManager:
         xout_depth.setStreamName("depth")
         xout_disp.setStreamName("disp")
 
+        # Prevent frame build-up on the device side (ref: rgb_video.py example)
+        # Only the latest frame is kept; older ones are dropped before XLink transfer
+        xout_rgb.input.setBlocking(False)
+        xout_rgb.input.setQueueSize(1)
+        xout_depth.input.setBlocking(False)
+        xout_depth.input.setQueueSize(1)
+        xout_disp.input.setBlocking(False)
+        xout_disp.input.setQueueSize(1)
+
         # ── Linking ──────────────────────────────────────────────────────
         cam_rgb.video.link(xout_rgb.input)
         mono_left.out.link(stereo.left)
@@ -134,10 +143,11 @@ class CameraManager:
         if self._stereo is not None:
             self._max_disp = self._stereo.initialConfig.getMaxDisparity()
 
-        # Non-blocking queues – always return the freshest frame
-        self._q_rgb   = self.device.getOutputQueue("rgb",   maxSize=2, blocking=False)
-        self._q_depth = self.device.getOutputQueue("depth", maxSize=2, blocking=False)
-        self._q_disp  = self.device.getOutputQueue("disp",  maxSize=2, blocking=False)
+        # Non-blocking queues with size=1 – always return the freshest frame
+        # Device-side queue is also size=1 (set above), so lag is eliminated end-to-end
+        self._q_rgb   = self.device.getOutputQueue("rgb",   maxSize=1, blocking=False)
+        self._q_depth = self.device.getOutputQueue("depth", maxSize=1, blocking=False)
+        self._q_disp  = self.device.getOutputQueue("disp",  maxSize=1, blocking=False)
 
         self.running = True
         t = threading.Thread(target=self._reader, daemon=True)
@@ -159,20 +169,23 @@ class CameraManager:
                 events = self.device.getQueueEvents(("rgb", "depth", "disp"))
                 for name in events:
                     if name == "rgb":
-                        pkt = self._q_rgb.tryGet()
-                        if pkt is not None:
+                        packets = self._q_rgb.tryGetAll()
+                        if len(packets) > 0:
+                            pkt = packets[-1]
                             with self._lock:
                                 self.frame_rgb = pkt.getCvFrame()   # BGR uint8
 
                     elif name == "depth":
-                        pkt = self._q_depth.tryGet()
-                        if pkt is not None:
+                        packets = self._q_depth.tryGetAll()
+                        if len(packets) > 0:
+                            pkt = packets[-1]
                             with self._lock:
                                 self.frame_depth = pkt.getFrame()   # uint16, mm
 
                     elif name == "disp":
-                        pkt = self._q_disp.tryGet()
-                        if pkt is not None:
+                        packets = self._q_disp.tryGetAll()
+                        if len(packets) > 0:
+                            pkt = packets[-1]
                             raw = pkt.getFrame()
                             if self._max_disp:
                                 raw = (raw * 255.0 / self._max_disp).astype(np.uint8)

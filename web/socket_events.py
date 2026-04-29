@@ -143,7 +143,7 @@ class SocketEvents:
                     'anomalies':    anomalies,
                     'rula_details': rula_details,
                     'reba_details': reba_details,
-                    'imu':          None, # IMU disabled per user request
+                    'imu':          self._get_imu_data(),
                 })
 
                 if skeleton_3d is not None:
@@ -173,3 +173,24 @@ class SocketEvents:
 
             # ~10 Hz processing rate
             time.sleep(1.0 / 10)
+
+    # ------------------------------------------------------------------
+    def _get_imu_data(self):
+        """Safely read from the Visual IMU manager."""
+        try:
+            imu_mgr = self.app.config.get('IMU_MANAGER')
+            if imu_mgr is None:
+                return None
+            d = imu_mgr.get_data()
+            roll, pitch, yaw = d.get('euler', (0.0, 0.0, 0.0))
+            ax, ay, az       = d.get('accel', (0.0, 0.0, 0.0))
+            gx, gy, gz       = d.get('gyro',  (0.0, 0.0, 0.0))
+            return {
+                'roll':  round(roll,  2),
+                'pitch': round(pitch, 2),
+                'yaw':   round(yaw,   2),
+                'accel': {'x': round(ax, 4), 'y': round(ay, 4), 'z': round(az, 4)},
+                'gyro':  {'x': round(gx, 4), 'y': round(gy, 4), 'z': round(gz, 4)},
+            }
+        except Exception:
+            return None

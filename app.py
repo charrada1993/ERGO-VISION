@@ -5,6 +5,7 @@ from config import Config
 Config.ensure_dirs()
 
 from camera.manager import CameraManager
+from camera.imu_manager import IMUManager
 from camera.calibration import CameraCalibration
 from pose.estimator import PoseEstimator
 from pose.fusion import PoseFusion
@@ -61,6 +62,12 @@ def main():
 
     # Update num_cams based on successfully initialized devices
     num_cams = len(cam_managers)
+
+    # ── 2b. Visual IMU (optical-flow based, no hardware IMU needed) ──────
+    imu_mgr = IMUManager()
+    imu_mgr.setup()
+    imu_mgr.set_camera_manager(cam_managers[0])   # uses primary camera RGB frames
+    imu_mgr.start()
     print(f"[Main] {num_cams} device(s) successfully started and streaming")
 
     # ── 3. Pose components ────────────────────────────────────────────────
@@ -85,7 +92,7 @@ def main():
     app.config['CAMERA_MANAGER']  = cam_managers[0] # Primary camera for video feed compatibility
     app.config['CAMERA_MODE']     = num_cams
     app.config['CALIBRATION']     = calibrations[0] if calibrations else None
-    app.config['IMU_MANAGER']     = None # Disabled
+    app.config['IMU_MANAGER']     = imu_mgr
 
     # ── 8. Socket event handler ──────────────────────────────────────────
     socket_events = SocketEvents(
@@ -104,6 +111,7 @@ def main():
         socketio.run(app, host='0.0.0.0', port=5000, debug=False)
     finally:
         print("[Main] Shutting down …")
+        imu_mgr.stop()
         for cam_mgr in cam_managers:
             cam_mgr.stop()
         for device in devices:
