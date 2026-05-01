@@ -67,11 +67,6 @@
         <div class="metric-value" id="reba-scoreC">--</div>
         <div class="metric-sub">A×B combined lookup</div>
       </div>
-      <div class="card metric-card" style="--accent:var(--orange)">
-        <div class="metric-label"><span class="mi"></span> Load / Force</div>
-        <div class="metric-value" id="reba-load">--</div>
-        <div class="metric-sub">0=&lt;5kg · 1=5-10kg · 2=&gt;10kg</div>
-      </div>
     </div>
 
     <!-- ── Sub-score breakdown ── -->
@@ -373,7 +368,6 @@
       setText('reba-tableA', d.table_a || '--');
       setText('reba-tableB', d.table_b || '--');
       setText('reba-scoreC', d.score_c || '--');
-      setText('reba-load', d.load || '0');
 
       setBar('rebaFinalBar', reba, 15);
 

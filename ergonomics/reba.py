@@ -35,14 +35,14 @@ class REBACalculator:
     def score_neck(angle, rotated=False, lateral=False):
         """
         Tableau Cou (reba_text.txt):
-          0–20° flexion  → 1
-          >20° flexion   → 2
-          extension      → 2
+          0–19° flexion  → 1
+          ≥20° flexion  → 2   (official example: 20° → score=2)
+          extension     → 2
         Additionnels: rotation→+1, inclinaison latérale→+1
         """
         if angle < 0:
             s = 2           # extension
-        elif angle <= 20:
+        elif angle < 20:
             s = 1
         else:
             s = 2
@@ -98,14 +98,15 @@ class REBACalculator:
     # Group B – Upper arm, Lower arm, Wrist
     # ------------------------------------------------------------------
     @staticmethod
-    def score_upper_arm(angle, supported=False, abducted=False):
+    def score_upper_arm(angle, supported=False):
         """
         Tableau Bras supérieur (reba_text.txt):
           bras le long du corps (≤20°) → 1
           20–45°  → 2
           45–90°  → 3
           >90°    → 4
-        Additionnels: bras soutenu → -1 ; charge/effort → +1
+        Additionnels: bras soutenu → +1 ; charge/effort → +1
+        Both text says “Bras soutenu → +1” (adds risk, not subtracts)
         """
         a = abs(angle)
         if a <= 20:
@@ -116,8 +117,7 @@ class REBACalculator:
             s = 3
         else:
             s = 4
-        if abducted:  s += 1
-        if supported: s -= 1
+        if supported: s += 1   # “Bras soutenu → +1” per REBA text
         return min(max(s, 1), 6)
 
     @staticmethod
@@ -166,25 +166,6 @@ class REBACalculator:
         ua = min(max(upper_arm, 1), 4)
         return table[la - 1][ua - 1] + wrist
 
-    # ------------------------------------------------------------------
-    # Load, grip, activity
-    # ------------------------------------------------------------------
-    @staticmethod
-    def score_load(weight_kg, grip_quality=0):
-        """
-        Section III (reba_text.txt):
-          <5 kg  → 0
-          5–10 kg → 1
-          >10 kg → 2
-        Qualité de prise: bonne=0, moyenne=1, mauvaise=2
-        """
-        if weight_kg < 5:
-            load = 0
-        elif weight_kg <= 10:
-            load = 1
-        else:
-            load = 2
-        return load + grip_quality
 
     # ------------------------------------------------------------------
     # Final REBA Table C (Score A × Score B)
@@ -221,7 +202,7 @@ class REBACalculator:
     # ------------------------------------------------------------------
     # Main compute entry point
     # ------------------------------------------------------------------
-    def compute(self, angles, load_kg=0, grip=0, repetitive=False):
+    def compute(self, angles):
         # ── Group A ────────────────────────────────────────────────────
         trunk = self.score_trunk(
                     angles.get('trunk', 0),
@@ -236,17 +217,14 @@ class REBACalculator:
         # ── Group B ────────────────────────────────────────────────────
         ua    = self.score_upper_arm(
                     angles.get('upper_arm_left', 0),
-                    abducted=(angles.get('shoulder_mod', 0) > 0))
+                    supported=False)  # Vision lacks support detection
         la    = self.score_lower_arm(angles.get('elbow_left', 90))
         wrist = self.score_wrist(angles.get('wrist_left', 0))
 
         scoreB = self.group_b_table(ua, la, wrist)
 
-        # ── Combine + adjustments ──────────────────────────────────────
-        base_c     = self.final_table(scoreA, scoreB)
-        load_score = self.score_load(load_kg, grip)
-        activity   = 1 if repetitive else 0
-        final      = base_c + load_score + activity
+        # ── Combine (angle-only, no load) ─────────────────────────────
+        final = self.final_table(scoreA, scoreB)
 
         risk = self.interpret(final)
         return {
@@ -266,8 +244,7 @@ class REBACalculator:
             "lower_arm_score":  la,
             "wrist_score":      wrist,
             "wrist_twist":      0,
-            "coupling":         grip,
-            "load_score":       load_score,
+            "coupling":         0,
         }
 
     # ------------------------------------------------------------------

@@ -7,22 +7,21 @@ class RULACalculator:
     # Group A – Upper arm, Lower arm, Wrist
     # ------------------------------------------------------------------
     @staticmethod
-    def score_upper_arm(angle, rotated=False, abducted=False, supported=False):
+    def score_upper_arm(angle, rotated=False, supported=False):
         """
         Tableau 1 (rula_text.txt):
           neutre / long du corps  → 1
-          élévation < 20°         → 2  (text shows 1 for neutral, 2 for <20°)
+          élévation < 20°         → 2
           élévation 20–45°        → 2
           élévation 45–90°        → 3
           élévation > 90°         → 4
-        Additionnels: rotation ext/int → +1 ; bras soutenu → +1 (abducted)
-        Note: supported arm gets -1 per standard RULA (arm resting on surface)
+        Additionnels: rotation ext/int → +1 ; bras soutenu ou charge modérée → +1
         """
         a = abs(angle)
         if a < 20:
-            s = 2           # <20° elevation (≈ along body = 1 is neutral/0°;
+            s = 2
         if a == 0:
-            s = 1           # truly neutral (arm hanging straight)
+            s = 1
         if 20 <= a <= 45:
             s = 2
         elif 45 < a <= 90:
@@ -33,8 +32,7 @@ class RULACalculator:
             s = 2 if a > 0 else 1
 
         if rotated:   s += 1
-        if abducted:  s += 1
-        if supported: s -= 1
+        if supported: s += 1   # "Bras soutenu ou charge modérée → +1" per RULA text
         return min(max(s, 1), 6)
 
     @staticmethod
@@ -69,22 +67,7 @@ class RULACalculator:
         return min(s, 4)
 
     @staticmethod
-    def score_load(weight_kg, repetitive=False):
-        """
-        Tableau 5 (rula_text.txt):
-          léger / pas de force        → 0
-          charge moyenne/répétitif    → 1
-          charge lourde/fort/prolongé → 2
-        """
-        if weight_kg < 2:
-            return 0
-        elif weight_kg <= 10:
-            return 1 if repetitive else 0
-        else:
-            return 2
-
-    @staticmethod
-    def group_a_table(upper_arm, lower_arm, wrist, wrist_twist, load):
+    def group_a_table(upper_arm, lower_arm, wrist, wrist_twist):
         """
         Tableau 6 (rula_text.txt) – exact values:
         Rows: (upper_arm, lower_arm)
@@ -115,7 +98,7 @@ class RULACalculator:
         row = table.get((ua, la), [1, 2, 2, 3])
         # Column index: wrist + wrist_twist combined, clamped 1-4
         col_idx = min(max(wrist + wrist_twist - 1, 1), 4) - 1
-        return row[col_idx] + load
+        return row[col_idx]
 
     # ------------------------------------------------------------------
     # Group B – Neck, Trunk, Legs
@@ -228,16 +211,15 @@ class RULACalculator:
     # ------------------------------------------------------------------
     # Main compute entry point
     # ------------------------------------------------------------------
-    def compute(self, angles, load_kg=0, repetitive=False):
+    def compute(self, angles):
         # ── Group A ────────────────────────────────────────────────────
         ua    = self.score_upper_arm(
                     angles.get('upper_arm_left', 0),
-                    abducted=(angles.get('shoulder_mod', 0) > 0))
+                    rotated=(angles.get('shoulder_mod', 0) > 0))
         la    = self.score_lower_arm(angles.get('elbow_left', 90))
         wrist = self.score_wrist(angles.get('wrist_left', 0))
-        load  = self.score_load(load_kg, repetitive)
         # wrist_twist=1 (neutral) – MediaPipe doesn't give hand axial rotation
-        groupA = self.group_a_table(ua, la, wrist, 1, load)
+        groupA = self.group_a_table(ua, la, wrist, 1)
 
         # ── Group B ────────────────────────────────────────────────────
         neck  = self.score_neck(
@@ -266,9 +248,8 @@ class RULACalculator:
             "neck_score":      neck,
             "trunk_score":     trunk,
             "legs_score":      legs,
-            "load_score":      load,
-            "muscle_score":    1 if repetitive else 0,
-            "activity_score":  1 if repetitive else 0,
+            "muscle_score":    0,
+            "activity_score":  0,
         }
 
     # ------------------------------------------------------------------
