@@ -124,7 +124,7 @@ class IMUManager:
                 if self.running:
                     print(f"[VisualIMU] Error: {e}")
 
-            time.sleep(1.0 / 30)   # target ~30 Hz
+            time.sleep(1.0 / 15)   # Match the 15 FPS camera rate
 
     # ------------------------------------------------------------------
     # Core optical-flow processing

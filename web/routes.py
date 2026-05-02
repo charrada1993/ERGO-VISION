@@ -88,21 +88,15 @@ def create_app():
                 frames = cam_mgr.get_latest_frames()
                 frame  = frames.get('rgb') if frames else None
                 if frame is not None:
-                    # Resize to 960px wide for fluid streaming
-                    h, w = frame.shape[:2]
-                    if w > 960:
-                        scale = 960 / w
-                        frame = cv2.resize(frame, (960, int(h * scale)),
-                                           interpolation=cv2.INTER_LINEAR)
                     ret, jpeg = cv2.imencode(
                         '.jpg', frame,
-                        [cv2.IMWRITE_JPEG_QUALITY, 82]
+                        [cv2.IMWRITE_JPEG_QUALITY, 70]
                     )
                     if ret:
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n\r\n'
-                               + jpeg.tobytes() + b'\r\n\r\n')
-                time.sleep(1.0 / 30)   # 30 fps cap
+                               + jpeg.tobytes() + b'--frame\r\n')
+                time.sleep(1.0 / 15)   # Match the 15 FPS camera rate
 
         return Response(generate(),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
@@ -119,28 +113,30 @@ def create_app():
                 frames = cam_mgr.get_latest_frames()
                 # Prefer the pre-colourised disparity; fallback: raw depth
                 frame = frames.get('disp') if frames else None
-                if frame is None:
+                if frame is not None:
+                    # If it's a 1-channel raw disparity frame, colourise it now
+                    if len(frame.shape) == 2:
+                        frame = cv2.applyColorMap(frame, cv2.COLORMAP_HOT)
+                else:
                     raw = frames.get('depth') if frames else None
                     if raw is not None:
-                        # Normalise uint16 depth to uint8 for display
+                        # Fallback: normalise uint16 depth to uint8 for display
                         norm = cv2.normalize(raw, None, 0, 255,
                                              cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                         frame = cv2.applyColorMap(norm, cv2.COLORMAP_HOT)
 
                 if frame is not None:
-                    h, w = frame.shape[:2]
-                    if w > 480:
-                        frame = cv2.resize(frame, (480, int(h * 480 / w)),
-                                           interpolation=cv2.INTER_LINEAR)
+                    # Resize to a smaller fixed size for depth
+                    frame = cv2.resize(frame, (480, 270), interpolation=cv2.INTER_NEAREST)
                     ret, jpeg = cv2.imencode(
                         '.jpg', frame,
-                        [cv2.IMWRITE_JPEG_QUALITY, 75]
+                        [cv2.IMWRITE_JPEG_QUALITY, 60]
                     )
                     if ret:
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n\r\n'
-                               + jpeg.tobytes() + b'\r\n\r\n')
-                time.sleep(1.0 / 15)   # 15 fps — depth is slower
+                               + jpeg.tobytes() + b'--frame\r\n')
+                time.sleep(1.0 / 10)   # Depth is heavy, update less frequently
 
         return Response(generate(),
                         mimetype='multipart/x-mixed-replace; boundary=frame')

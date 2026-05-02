@@ -12,7 +12,7 @@ import cv2
 # Resolution for stereo cameras - 720P gives best depth quality/performance balance
 MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_720_P
 RGB_SOCKET      = dai.CameraBoardSocket.CAM_A
-FPS             = 30
+FPS             = 15
 
 
 class CameraManager:
@@ -47,7 +47,7 @@ class CameraManager:
         # ── RGB camera ──────────────────────────────────────────────────
         cam_rgb = self.pipeline.create(dai.node.Camera)
         cam_rgb.setBoardSocket(RGB_SOCKET)
-        cam_rgb.setSize(1280, 720)
+        cam_rgb.setSize(640, 360)
         cam_rgb.setFps(FPS)
 
         # ── Mono cameras ────────────────────────────────────────────────
@@ -179,19 +179,17 @@ class CameraManager:
                     with self._lock:
                         self.frame_depth = pkt.getFrame()   # uint16, mm
                 
-                # 3. Disparity
+                # 3. Disparity - Skip colour mapping in background thread to save CPU
+                # Let the depth_feed route handle colourisation on-demand.
                 packets = self._q_disp.tryGetAll()
                 if len(packets) > 0:
                     pkt = packets[-1]
                     raw = pkt.getFrame()
-                    if self._max_disp:
-                        raw = (raw * 255.0 / self._max_disp).astype(np.uint8)
-                    coloured = cv2.applyColorMap(raw, cv2.COLORMAP_HOT)
                     with self._lock:
-                        self.frame_disp = coloured          # BGR uint8
+                        self.frame_disp = raw               # raw disparity uint8
                 
-                # Small sleep to prevent CPU hogging
-                time.sleep(0.005)
+                # Wait a bit longer to match the 15 FPS rate and reduce CPU load
+                time.sleep(0.01)
 
             except Exception as e:
                 if self.running:
