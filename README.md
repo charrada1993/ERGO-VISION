@@ -36,12 +36,14 @@
 **ERGO-VISION** is a fully open-source, real-time ergonomic risk assessment system designed for industrial and occupational health environments. It uses one to three **OAK-D** (OpenCV AI Kit with Depth) cameras to:
 
 - Capture synchronized **RGB + aligned stereo depth** streams
-- Detect and track human body keypoints with **MediaPipe Pose**
+- Detect and track human body keypoints with **MediaPipe Pose** (Optimized for NVIDIA Jetson Orin)
+- **Depth-Based Masking**: Auto-filters background workers for robust single-subject tracking
 - Compute **joint angles** (neck, trunk, arms, wrists, elbows)
 - Calculate standardized **RULA** and **REBA** ergonomic risk scores
 - Derive **orientation data** (roll, pitch, yaw) from optical flow — **no hardware IMU required**
 - Display everything on a **live Flask + Socket.IO web dashboard**
-- Log session data to **CSV** and generate professional **PDF reports**
+- **Data Collection**: Record multi-joint kinematic sessions to timestamped CSV files
+- **Automated Reporting**: Generate professional **PDF ergonomic risk reports** with analytics and charts
 
 The system runs on **NVIDIA Jetson Orin** (Ubuntu) or any Linux/Windows machine with Python 3.10+.
 
@@ -133,8 +135,9 @@ The system runs on **NVIDIA Jetson Orin** (Ubuntu) or any Linux/Windows machine 
 | 🌀 **Visual IMU** | Roll/pitch/yaw from optical flow — no hardware IMU needed |
 | 🌐 **Live web dashboard** | Flask + Socket.IO, accessible from any browser on the network |
 | 🗄️ **Data logging** | CSV session logs with timestamps and all angle/score data |
-| 📄 **PDF reports** | Auto-generated professional reports with charts |
-| ⚡ **Zero-lag streaming** | `tryGetAll()` + device-side queue=1 eliminates frame buildup |
+| 📄 **PDF reports** | Professional risk reports with analytics, joint stats, and clinical recommendations |
+| 🛡️ **Depth-Masking** | 0.5m – 3.0m depth filter to ignore background people and noise |
+| ⚡ **Jetson Orin Ready** | Model complexity 0 + optimized queues for zero-lag performance |
 
 ---
 
@@ -291,6 +294,8 @@ http://localhost:5000/dashboard
 | `/rula` | RULA score breakdown (Group A, B, sub-scores) |
 | `/reba` | REBA score breakdown (Group A, B, sub-scores) |
 | `/3d` | Interactive Three.js 3D skeleton viewer |
+| `/collection` | **[NEW]** Data collection page (Start/Stop recording to CSV) |
+| `/report` | **[NEW]** Report generation engine (CSV → PDF) |
 
 ---
 
@@ -420,11 +425,18 @@ result = reba.compute(angles, load_kg=0, grip=0, repetitive=False)
 
 **Files:** `data/logger.py`, `reporting/report_generator.py`
 
-- Session data logged to `sessions/` as CSV every 0.5 seconds
-- PDF reports generated to `reports/` with:
-  - Angle time-series charts (matplotlib)
-  - RULA/REBA score summary
-  - Risk level classification table
+- **Data Collection (`/collection`)**:
+  - Live stream with recording status indicators.
+  - Generates timestamped CSV files in `data_sessions/`.
+  - Logs: `timestamp`, `frame_id`, `joint_angles`, `RULA/REBA scores`, `anomalies`.
+- **Report Generation (`/report`)**:
+  - Automatically lists available recorded sessions.
+  - Generates comprehensive PDF reports in `reports/` including:
+    - **Executive Summary**: Mean/Peak risk levels.
+    - **Joint Statistics**: Min/Max/Mean/95th percentile analysis.
+    - **AI Insights**: Identification of critical joints and anomaly counts.
+    - **Visual Analytics**: Time-series graphs for risk and posture.
+    - **Clinical Recommendations**: Dynamic suggestions based on data.
 
 ---
 
