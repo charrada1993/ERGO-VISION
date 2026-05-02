@@ -18,6 +18,7 @@ class SocketEvents:
         self.logger     = logger
         self.app        = app
         self.running    = True
+        self.is_recording = False
         self._frame_count = 0
 
         @socketio.on('connect')
@@ -25,6 +26,20 @@ class SocketEvents:
             print("[Socket] Client connected")
             mode = len(self.cam_managers)
             emit('config', {'mode': mode, 'usb3': True})
+
+        @socketio.on('start_recording')
+        def handle_start_recording():
+            print("[Socket] Start recording requested")
+            filename = self.logger.start_session()
+            self.is_recording = True
+            emit('recording_status', {'is_recording': True, 'filename': filename, 'samples': 0})
+
+        @socketio.on('stop_recording')
+        def handle_stop_recording():
+            print("[Socket] Stop recording requested")
+            self.is_recording = False
+            self.logger.end_session()
+            emit('recording_status', {'is_recording': False, 'samples': self.logger.sample_count})
 
     # ──────────────────────────────────────────────────────────────────
     def process_loop(self):
@@ -56,7 +71,18 @@ class SocketEvents:
                         depth_frame = frames.get('depth')
 
                     if rgb is not None:
-                        lm = self.pose_est.get_landmarks(rgb)
+                        # OPTION 1: Depth-Based Masking
+                        # Only process pixels within the "working zone" (e.g., 0.5m to 3.0m)
+                        # This prevents MediaPipe from latching onto multiple people in the background
+                        masked_rgb = rgb
+                        if frames.get('depth') is not None:
+                            depth = frames.get('depth')
+                            if depth.shape == rgb.shape[:2]:
+                                mask = (depth > 500) & (depth < 3000)
+                                masked_rgb = rgb.copy()
+                                masked_rgb[~mask] = 0
+                                
+                        lm = self.pose_est.get_landmarks(masked_rgb)
                         all_landmarks.append(lm)
                     else:
                         all_landmarks.append(None)
@@ -133,7 +159,7 @@ class SocketEvents:
                     anomalies.append("Shoulder elevated above 90°")
 
                 # ── 5. Emit Socket.IO update ──────────────────────────
-                self.socketio.emit('pose_update', {
+                payload = {
                     'angles':       angles,
                     'rula':         rula_res.get('RULA_score', 0),
                     'reba':         reba_res.get('REBA_score', 0),
@@ -142,16 +168,24 @@ class SocketEvents:
                     'rula_details': rula_details,
                     'reba_details': reba_details,
                     'imu':          self._get_imu_data(),
-                })
+                }
+                if self.is_recording:
+                    payload['recording'] = {
+                        'is_recording': True,
+                        'samples': self.logger.sample_count
+                    }
+
+                self.socketio.emit('pose_update', payload)
 
                 if skeleton_3d is not None:
                     self.socketio.emit('skeleton_3d', {
                         'landmarks': skeleton_3d.tolist() if hasattr(skeleton_3d, 'tolist') else skeleton_3d
                     })
 
-                # ── 6. Periodic logging (0.5 s) ───────────────────────
+                # ── 6. Logging (Continuous if recording, periodic otherwise) ──
                 now = time.time()
-                if now - last_log >= 0.5:
+                should_log = self.is_recording or (now - last_log >= 0.5)
+                if should_log:
                     try:
                         from ergonomics.risk import RiskAnalyzer
                         vision_anoms = RiskAnalyzer.detect_anomalies(
@@ -163,7 +197,8 @@ class SocketEvents:
                                         vision_anoms + anomalies)
                     except Exception as log_err:
                         print(f"[Processing] Logger error: {log_err}")
-                    last_log = now
+                    if not self.is_recording:
+                        last_log = now
 
             except Exception as e:
                 print(f"[Processing] ERROR: {e}")

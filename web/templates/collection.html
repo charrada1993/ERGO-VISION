@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ErgoVision | Data Collection</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+  <style>
+    .record-controls {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 1rem;
+    }
+    .btn-record {
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    .btn-start {
+      background-color: var(--cyan);
+      color: var(--bg-dark);
+    }
+    .btn-start:hover {
+      background-color: #00d2ff;
+      transform: translateY(-2px);
+    }
+    .btn-stop {
+      background-color: #ff4757;
+      color: white;
+    }
+    .btn-stop:hover {
+      background-color: #ff6b81;
+      transform: translateY(-2px);
+    }
+    .btn-disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .status-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .recording-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #ff4757;
+      margin-right: 8px;
+      animation: blink 1s infinite;
+      display: none;
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+    .samples-count {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--cyan);
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Navbar ── -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-icon"><i class="fas fa-heartbeat"></i></span>
+      <span class="logo">ErgoVision</span>
+    </div>
+    <div class="nav-links">
+      <a href="/"><i class="fas fa-gauge-high"></i><span>Dashboard</span></a>
+      <a href="/camera"><i class="fas fa-video"></i><span>Live Feed</span></a>
+      <a href="/rula"><i class="fas fa-person-rays"></i><span>RULA</span></a>
+      <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
+      <a href="/3d"><i class="fas fa-cube"></i><span>3D View</span></a>
+      <a href="/collection" class="active"><i class="fas fa-database"></i><span>Record Data</span></a>
+      <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
+    </div>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main class="container">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fas fa-database"></i> Session Data Collection</h1>
+      <p class="page-sub">Record real-time multi-joint kinematic data and risk scores to CSV.</p>
+    </div>
+
+    <div class="dash-grid">
+      <div class="col-main">
+        <div class="card video-panel" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+          <div class="panel-header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
+            <div class="panel-title"><i class="fas fa-video" style="color:var(--cyan)"></i> Live Camera</div>
+          </div>
+          <div style="position: relative; width: 100%; background: #000; display: flex; justify-content: center; align-items: center; min-height: 480px;">
+            <img id="videoFeed" src="/video_feed" alt="Live RGB Feed" style="width: 100%; height: auto; max-height: 600px; object-fit: contain;">
+          </div>
+        </div>
+      </div>
+
+      <div class="col-side">
+        <div class="status-panel">
+          <h2><span class="recording-indicator" id="recIndicator"></span><span id="statusText">Ready to Record</span></h2>
+          <div class="samples-count" id="sampleCount">0</div>
+          <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">Samples Collected</div>
+          
+          <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);" id="currentFile">
+            No active session
+          </div>
+
+          <div class="record-controls">
+            <button class="btn-record btn-start" id="btnStart"><i class="fas fa-circle" style="color: #ff4757;"></i> Start</button>
+            <button class="btn-record btn-stop btn-disabled" id="btnStop"><i class="fas fa-square"></i> Stop</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const socket = io();
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const recIndicator = document.getElementById('recIndicator');
+    const statusText = document.getElementById('statusText');
+    const sampleCount = document.getElementById('sampleCount');
+    const currentFile = document.getElementById('currentFile');
+
+    btnStart.addEventListener('click', () => {
+      socket.emit('start_recording');
+      btnStart.classList.add('btn-disabled');
+    });
+
+    btnStop.addEventListener('click', () => {
+      socket.emit('stop_recording');
+      btnStop.classList.add('btn-disabled');
+    });
+
+    socket.on('recording_status', (data) => {
+      if (data.is_recording) {
+        btnStart.classList.add('btn-disabled');
+        btnStop.classList.remove('btn-disabled');
+        recIndicator.style.display = 'inline-block';
+        statusText.innerText = 'Recording...';
+        statusText.style.color = '#ff4757';
+        currentFile.innerHTML = `File: <strong>${data.filename}</strong>`;
+        sampleCount.innerText = data.samples || 0;
+      } else {
+        btnStart.classList.remove('btn-disabled');
+        btnStop.classList.add('btn-disabled');
+        recIndicator.style.display = 'none';
+        statusText.innerText = 'Ready to Record';
+        statusText.style.color = 'var(--text)';
+        if (data.samples !== undefined) {
+          sampleCount.innerText = data.samples;
+          currentFile.innerHTML = `Saved <strong>${data.samples}</strong> samples.`;
+        }
+      }
+    });
+
+    socket.on('pose_update', (data) => {
+      if (data.recording && data.recording.is_recording) {
+        sampleCount.innerText = data.recording.samples;
+      }
+    });
+  </script>
+</body>
+</html>

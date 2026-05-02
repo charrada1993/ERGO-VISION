@@ -160,38 +160,38 @@ class CameraManager:
     def _reader(self):
         """
         Continuously drain the three output queues.
-        Uses device.getQueueEvents() to avoid busy-waiting – wakes only
-        when new data arrives (mirrors rgb_depth_aligned.py pattern).
+        Uses non-blocking tryGetAll() and sleep to prevent any lag or blocking
+        on NVIDIA Orin and other platforms.
         """
         while self.running:
             try:
-                # Wait for any queue to have data (5 ms timeout keeps CPU low)
-                events = self.device.getQueueEvents(("rgb", "depth", "disp"))
-                for name in events:
-                    if name == "rgb":
-                        packets = self._q_rgb.tryGetAll()
-                        if len(packets) > 0:
-                            pkt = packets[-1]
-                            with self._lock:
-                                self.frame_rgb = pkt.getCvFrame()   # BGR uint8
-
-                    elif name == "depth":
-                        packets = self._q_depth.tryGetAll()
-                        if len(packets) > 0:
-                            pkt = packets[-1]
-                            with self._lock:
-                                self.frame_depth = pkt.getFrame()   # uint16, mm
-
-                    elif name == "disp":
-                        packets = self._q_disp.tryGetAll()
-                        if len(packets) > 0:
-                            pkt = packets[-1]
-                            raw = pkt.getFrame()
-                            if self._max_disp:
-                                raw = (raw * 255.0 / self._max_disp).astype(np.uint8)
-                            coloured = cv2.applyColorMap(raw, cv2.COLORMAP_HOT)
-                            with self._lock:
-                                self.frame_disp = coloured          # BGR uint8
+                # 1. RGB
+                packets = self._q_rgb.tryGetAll()
+                if len(packets) > 0:
+                    pkt = packets[-1]
+                    with self._lock:
+                        self.frame_rgb = pkt.getCvFrame()   # BGR uint8
+                
+                # 2. Depth
+                packets = self._q_depth.tryGetAll()
+                if len(packets) > 0:
+                    pkt = packets[-1]
+                    with self._lock:
+                        self.frame_depth = pkt.getFrame()   # uint16, mm
+                
+                # 3. Disparity
+                packets = self._q_disp.tryGetAll()
+                if len(packets) > 0:
+                    pkt = packets[-1]
+                    raw = pkt.getFrame()
+                    if self._max_disp:
+                        raw = (raw * 255.0 / self._max_disp).astype(np.uint8)
+                    coloured = cv2.applyColorMap(raw, cv2.COLORMAP_HOT)
+                    with self._lock:
+                        self.frame_disp = coloured          # BGR uint8
+                
+                # Small sleep to prevent CPU hogging
+                time.sleep(0.005)
 
             except Exception as e:
                 if self.running:

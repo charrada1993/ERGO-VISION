@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ErgoVision | Report Generation</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    .report-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+      color: var(--text);
+    }
+    .session-select {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-dark);
+      color: var(--text);
+      font-size: 1rem;
+    }
+    .btn-generate {
+      width: 100%;
+      padding: 1rem;
+      background-color: var(--cyan);
+      color: var(--bg-dark);
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-generate:hover {
+      background-color: #00d2ff;
+      transform: translateY(-2px);
+    }
+    .btn-generate:disabled {
+      background-color: var(--border);
+      cursor: not-allowed;
+      transform: none;
+    }
+    .spinner {
+      display: none;
+      margin-left: 10px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Navbar ── -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-icon"><i class="fas fa-heartbeat"></i></span>
+      <span class="logo">ErgoVision</span>
+    </div>
+    <div class="nav-links">
+      <a href="/"><i class="fas fa-gauge-high"></i><span>Dashboard</span></a>
+      <a href="/camera"><i class="fas fa-video"></i><span>Live Feed</span></a>
+      <a href="/rula"><i class="fas fa-person-rays"></i><span>RULA</span></a>
+      <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
+      <a href="/3d"><i class="fas fa-cube"></i><span>3D View</span></a>
+      <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
+      <a href="/report" class="active"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
+    </div>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main class="container">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fas fa-file-pdf"></i> Report Generation</h1>
+      <p class="page-sub">Generate comprehensive PDF risk assessments from recorded sessions.</p>
+    </div>
+
+    <div class="report-panel">
+      <div class="form-group">
+        <label for="sessionSelect">Select Recorded Session</label>
+        <select id="sessionSelect" class="session-select">
+          <option value="">Loading sessions...</option>
+        </select>
+      </div>
+
+      <button class="btn-generate" id="btnGenerate" disabled>
+        <i class="fas fa-file-export"></i> Generate PDF Report <i class="fas fa-spinner spinner" id="spinner"></i>
+      </button>
+
+      <div id="statusMsg" style="margin-top: 15px; text-align: center; color: var(--text-muted);"></div>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const select = document.getElementById('sessionSelect');
+      const btn = document.getElementById('btnGenerate');
+      const spinner = document.getElementById('spinner');
+      const msg = document.getElementById('statusMsg');
+
+      // Fetch sessions
+      fetch('/api/sessions')
+        .then(res => res.json())
+        .then(data => {
+          select.innerHTML = '';
+          if (data.sessions && data.sessions.length > 0) {
+            // Sort by newest first
+            data.sessions.sort().reverse();
+            data.sessions.forEach(session => {
+              const opt = document.createElement('option');
+              opt.value = session;
+              opt.textContent = session;
+              select.appendChild(opt);
+            });
+            btn.disabled = false;
+          } else {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No recorded sessions found.';
+            select.appendChild(opt);
+          }
+        })
+        .catch(err => {
+          select.innerHTML = '<option value="">Error loading sessions</option>';
+          console.error(err);
+        });
+
+      // Handle generation
+      btn.addEventListener('click', () => {
+        const filename = select.value;
+        if (!filename) return;
+
+        btn.disabled = true;
+        spinner.style.display = 'inline-block';
+        msg.innerText = 'Analyzing data and generating PDF...';
+        msg.style.color = 'var(--text)';
+
+        window.location.href = `/api/generate_report/${filename}`;
+
+        // Reset UI after short delay assuming download started
+        setTimeout(() => {
+          btn.disabled = false;
+          spinner.style.display = 'none';
+          msg.innerText = 'Download started!';
+          msg.style.color = 'var(--green)';
+        }, 3000);
+      });
+    });
+  </script>
+</body>
+</html>

@@ -24,8 +24,8 @@ def main():
         print("[Main] No OAK-D device found. Exiting.")
         return
     
-    # Limit to max 3 cameras
-    devices_info = devices_info[:3]
+    # Limit to 1 camera as requested
+    devices_info = devices_info[:1]
     num_cams = len(devices_info)
     print(f"[Main] Detected {num_cams} OAK-D device(s)")
 
@@ -81,7 +81,7 @@ def main():
 
     # ── 5. Data logger ────────────────────────────────────────────────────
     logger = DataLogger()
-    logger.start_session()
+    # Session is started dynamically via Socket.IO events
 
     # ── 6. Flask app and SocketIO ────────────────────────────────────────
     app, socketio = create_app()

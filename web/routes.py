@@ -1,5 +1,5 @@
 # web/routes.py
-from flask import Flask, render_template, jsonify, Response
+from flask import Flask, render_template, jsonify, Response, send_file
 from flask_socketio import SocketIO
 from config import Config
 import os
@@ -38,6 +38,14 @@ def create_app():
     def threed_page():
         return render_template('3d.html')
 
+    @app.route('/collection')
+    def collection_page():
+        return render_template('collection.html')
+
+    @app.route('/report')
+    def report_page():
+        return render_template('report.html')
+
     # ─── API routes ───────────────────────────────────────────────────
     @app.route('/api/config')
     def api_config():
@@ -48,6 +56,25 @@ def create_app():
             'imu':     False,
             'has_rv':  False,
         })
+
+    @app.route('/api/sessions')
+    def api_sessions():
+        os.makedirs(Config.SESSION_DIR, exist_ok=True)
+        files = [f for f in os.listdir(Config.SESSION_DIR) if f.endswith('.csv')]
+        return jsonify({'sessions': files})
+
+    @app.route('/api/generate_report/<filename>')
+    def api_generate_report(filename):
+        csv_path = os.path.join(Config.SESSION_DIR, filename)
+        if not os.path.exists(csv_path):
+            return "File not found", 404
+        
+        from reporting.report_generator import ReportGenerator
+        try:
+            pdf_path = ReportGenerator.generate(csv_path)
+            return send_file(pdf_path, as_attachment=True, download_name=os.path.basename(pdf_path))
+        except Exception as e:
+            return f"Error generating report: {str(e)}", 500
 
     # ─── RGB MJPEG stream ─────────────────────────────────────────────
     @app.route('/video_feed')
