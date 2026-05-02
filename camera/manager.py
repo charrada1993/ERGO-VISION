@@ -9,8 +9,8 @@ import time
 import numpy as np
 import cv2
 
-# Resolution for stereo cameras - 720P gives best depth quality/performance balance
-MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_720_P
+# Resolution for stereo cameras - 400P is much faster for depth on Jetson
+MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_400_P
 RGB_SOCKET      = dai.CameraBoardSocket.CAM_A
 FPS             = 15
 

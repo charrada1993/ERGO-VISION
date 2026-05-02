@@ -78,9 +78,9 @@ class SocketEvents:
                         if frames.get('depth') is not None:
                             depth = frames.get('depth')
                             if depth.shape == rgb.shape[:2]:
-                                mask = (depth > 500) & (depth < 3000)
-                                masked_rgb = rgb.copy()
-                                masked_rgb[~mask] = 0
+                                # Efficient bitwise masking instead of array copy
+                                mask = ((depth > 500) & (depth < 3000)).astype(np.uint8)
+                                masked_rgb = cv2.bitwise_and(rgb, rgb, mask=mask)
                                 
                         lm = self.pose_est.get_landmarks(masked_rgb)
                         all_landmarks.append(lm)

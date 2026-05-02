@@ -6,8 +6,8 @@ import numpy as np
 mp_pose = mp.solutions.pose
 pose_model = mp_pose.Pose(
     static_image_mode=False,
-    model_complexity=0,  # Reduced from 1 to 0 for Jetson Orin real-time speed
-    smooth_landmarks=True,
+    model_complexity=0,
+    smooth_landmarks=False,  # Faster on Jetson
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
 )
