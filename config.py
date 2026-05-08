@@ -4,8 +4,8 @@ import os
 class Config:
     # Camera
     MAX_CAMERAS = 1              # Single OAK-D camera only
-    PROCESSING_FPS = 10          # Target pose estimation frequency (Hz)
-    LOG_INTERVAL = 0.5           # Log data every 0.5 seconds
+    PROCESSING_FPS = 8           # Target pose estimation frequency (Hz) — matches camera FPS
+    LOG_INTERVAL = 1.0           # Log data every 1.0 second (halved from 0.5 to save I/O)
 
     # Paths (absolute or relative to project root)
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,10 +42,10 @@ class JetsonConfig:
     MAX_CAMERAS         = 1           # USB 2.0 cannot sustain more than one OAK-D
 
     # USB 2.0 constraint: keep RGB small to avoid saturating the bus.
-    # 416×320 @ 8 fps = ~4 MB/s for RGB (comfortably within USB2 budget)
+    # 640×360 @ 8 fps = ~5.5 MB/s for RGB (comfortably within USB2 budget)
     CAMERA_FPS          = 8           # fps for RGB + mono cameras
-    RGB_WIDTH           = 416         # pixels – USB2-safe resolution
-    RGB_HEIGHT          = 320
+    RGB_WIDTH           = 640         # 16:9 aspect ratio prevents center-crop zoom
+    RGB_HEIGHT          = 360
 
     # THE_400_P (640×400) — lowest valid DepthAI mono resolution; THE_320_P does not exist
     MONO_RESOLUTION     = "THE_400_P"  # Lowest valid DepthAI mono res (640x400)
@@ -71,15 +71,20 @@ class JetsonConfig:
     IMU_HALF_RES        = True        # resize frame to half before flow
 
     # ── Socket.IO emit throttling ──────────────────────────────────────
-    SKELETON_EMIT_EVERY  = 3          # emit skeleton_3d every N frames
-    IMU_SAMPLE_EVERY     = 3          # re-sample IMU every N frames
-    DEPTH_MASK_EVERY     = 2          # apply depth mask every N frames
+    SKELETON_EMIT_EVERY  = 4          # emit skeleton_3d every N frames (was 3)
+    IMU_SAMPLE_EVERY     = 5          # re-sample IMU every N frames (was 3)
+    DEPTH_MASK_EVERY     = 3          # apply depth mask every N frames (was 2)
+
+    # ── Process loop timing ───────────────────────────────────────────
+    PROCESS_LOOP_SLEEP   = 0.005      # yield GIL after successful emit (5 ms)
+    POSE_UPDATE_MAX_HZ   = 5          # hard cap on pose_update Socket.IO events
 
     # ── MJPEG streaming ───────────────────────────────────────────────
-    VIDEO_JPEG_QUALITY  = 55          # 0-100 (lower = faster encode)
-    VIDEO_WIDTH         = 416
-    VIDEO_HEIGHT        = 320
-    DEPTH_JPEG_QUALITY  = 50
+    VIDEO_JPEG_QUALITY  = 50          # 0-100 (was 55; lower = faster encode on ARM)
+    VIDEO_WIDTH         = 320         # stream at 320×240 — 43% fewer pixels than 416×320
+    VIDEO_HEIGHT        = 240
+    VIDEO_STREAM_FPS    = 8           # explicit FPS cap for MJPEG generator
+    DEPTH_JPEG_QUALITY  = 45          # depth map quality (was 50)
     DEPTH_WIDTH         = 320
     DEPTH_HEIGHT        = 180
-    DEPTH_STREAM_FPS    = 5           # Hz – depth colormap is CPU-heavy
+    DEPTH_STREAM_FPS    = 4           # Hz – depth colormap is CPU-heavy (was 5)

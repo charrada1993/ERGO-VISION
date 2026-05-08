@@ -3,7 +3,12 @@
 # passing to MediaPipe. This is the single biggest CPU saving in the pipeline.
 # MediaPipe landmarks are normalised 0-1, so they map correctly to any
 # original resolution without any coordinate correction.
+#
+# Thread-safety note: MediaPipe's Pose object is NOT thread-safe when shared.
+# A module-level threading.Lock guards process() calls to prevent corruption
+# if multiple callers ever share the singleton (defensive — currently single-threaded).
 
+import threading
 import mediapipe as mp
 import cv2
 import numpy as np
@@ -17,6 +22,7 @@ pose_model = mp_pose.Pose(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
 )
+_pose_lock = threading.Lock()   # Protects pose_model.process() — not re-entrant
 
 # Target inference resolution: 320×180
 # At 416×320 input from camera, a resize to 320×180 is very fast (INTER_LINEAR).
@@ -41,7 +47,9 @@ class PoseEstimator:
 
         # MediaPipe requires RGB
         rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
-        results = pose_model.process(rgb)
+
+        with _pose_lock:
+            results = pose_model.process(rgb)
 
         if results.pose_landmarks:
             landmarks = [

@@ -34,8 +34,9 @@ _FEATURE_PARAMS = dict(
     minDistance  = 12,
     blockSize    = 5,
 )
-_REDETECT_INTERVAL = JetsonConfig.IMU_REDETECT_INTERVAL  # 20 – was 10
-_HALF_RES          = JetsonConfig.IMU_HALF_RES            # resize input to half
+_REDETECT_INTERVAL = 15                           # re-detect features every N frames (was 20)
+_HALF_RES          = JetsonConfig.IMU_HALF_RES     # resize input to half
+_HOMOGRAPHY_EVERY  = 5                             # only run findHomography every N frames (CPU-heavy)
 _EMA_ALPHA         = 0.3  # smoothing factor (0 = no update, 1 = no smoothing)
 _SCALE_ACCEL       = 0.02 # pixels/frame → pseudo m/s²  (display scale, not physical)
 _SCALE_GYRO        = 0.5  # rotation deg/frame → pseudo rad/s
@@ -75,6 +76,7 @@ class IMUManager:
         self._gx    = 0.0   # pseudo-gyro x (rad/s equivalent)
         self._gy    = 0.0
         self._gz    = 0.0
+        self._homo_frame_idx = 0  # counter for homography throttle
 
         self.latest = self._make_snapshot()
         self.callback = None
@@ -177,20 +179,18 @@ class IMUManager:
         ax_raw = float(mean_flow[0]) * _SCALE_ACCEL
         ay_raw = float(mean_flow[1]) * _SCALE_ACCEL
 
-        # ── Homography → rotational component ────────────────────────────
-        H, mask = cv2.findHomography(good_prev, good_next, cv2.RANSAC, 3.0)
-
+        # ── Homography → rotational component (throttled every N frames) ─────
         roll_delta = pitch_delta = yaw_delta = 0.0
         gz_raw     = 0.0
+        self._homo_frame_idx += 1
 
-        if H is not None:
-            # In-plane rotation from homography → pseudo yaw
-            angle_rad  = math.atan2(H[1, 0], H[0, 0])
-            gz_raw     = angle_rad * _SCALE_GYRO
-            yaw_delta  = math.degrees(angle_rad)
-        else:
-            gz_raw    = 0.0
-            yaw_delta = 0.0
+        if self._homo_frame_idx % _HOMOGRAPHY_EVERY == 0:
+            H, mask = cv2.findHomography(good_prev, good_next, cv2.RANSAC, 3.0)
+            if H is not None:
+                angle_rad  = math.atan2(H[1, 0], H[0, 0])
+                gz_raw     = angle_rad * _SCALE_GYRO
+                yaw_delta  = math.degrees(angle_rad)
+        # else: reuse last gz_raw / yaw_delta (both stay 0 until first compute)
 
         # ── Exact formulas from reference screenshot ──────────────────────
         # Pitch (θ) = atan2(ax, sqrt(ay² + az²)) × 180 / π

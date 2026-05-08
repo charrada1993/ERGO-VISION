@@ -1,6 +1,6 @@
 # web/routes.py
 # Optimized for Jetson Orin reComputer J3011 over USB 2.0.
-# MJPEG streams use JetsonConfig dimensions and quality settings.
+# MJPEG streams use JetsonConfig dimensions, quality, and FPS cap settings.
 from flask import Flask, render_template, jsonify, Response, send_file
 from flask_socketio import SocketIO
 from config import Config, JetsonConfig
@@ -17,7 +17,13 @@ def create_app():
         static_folder=os.path.join(Config.BASE_DIR, 'web', 'static')
     )
     app.config['SECRET_KEY'] = 'ergosecret!'
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode='threading',
+        logger=False,           # disable verbose SocketIO logs (CPU saving)
+        engineio_logger=False,
+    )
 
     # Page routes
     @app.route('/')
@@ -79,10 +85,10 @@ def create_app():
         except Exception as e:
             return f"Error generating report: {str(e)}", 500
 
-    # RGB MJPEG stream — USB 2.0 optimized
-    # Rate: JetsonConfig.CAMERA_FPS (8 fps)
-    # Size: JetsonConfig.VIDEO_WIDTH x VIDEO_HEIGHT (416x320)
-    # Quality: JetsonConfig.VIDEO_JPEG_QUALITY (55)
+    # ── RGB MJPEG stream ─────────────────────────────────────────────────────
+    # Rate cap: JetsonConfig.VIDEO_STREAM_FPS (8 fps)
+    # Size:     JetsonConfig.VIDEO_WIDTH × VIDEO_HEIGHT (320×240)
+    # Quality:  JetsonConfig.VIDEO_JPEG_QUALITY (50)
     @app.route('/video_feed')
     def video_feed():
         cam_mgr = app.config.get('CAMERA_MANAGER')
@@ -90,25 +96,33 @@ def create_app():
             return "Camera not available", 404
 
         def generate():
-            # Stream at 320×240 — 43% fewer pixels than 416×320, much faster encode
-            _w = 320
-            _h = 240
-            _q = JetsonConfig.VIDEO_JPEG_QUALITY   # 55
-            _params = [cv2.IMWRITE_JPEG_QUALITY, _q]
+            _w        = JetsonConfig.VIDEO_WIDTH         # 320
+            _h        = JetsonConfig.VIDEO_HEIGHT        # 240
+            _q        = JetsonConfig.VIDEO_JPEG_QUALITY  # 50
+            _interval = 1.0 / JetsonConfig.VIDEO_STREAM_FPS  # 0.125 s at 8 fps
+            _params   = [cv2.IMWRITE_JPEG_QUALITY, _q]
             _last_frame = None   # track last served frame to avoid re-encoding
+            _last_sent  = 0.0
 
             while True:
+                now = time.time()
+                # FPS cap: sleep until the next frame window opens
+                elapsed = now - _last_sent
+                if elapsed < _interval:
+                    time.sleep(_interval - elapsed)
+                    now = time.time()
+
                 frames = cam_mgr.get_latest_frames()
                 frame  = frames.get('rgb') if frames else None
 
                 if frame is None or frame is _last_frame:
-                    # No new frame yet — micro-sleep and retry
-                    time.sleep(0.005)
+                    time.sleep(0.010)
                     continue
 
                 _last_frame = frame
+                _last_sent  = now
 
-                # Resize to stream resolution
+                # Resize to stream resolution if needed
                 if frame.shape[1] != _w or frame.shape[0] != _h:
                     frame = cv2.resize(frame, (_w, _h),
                                        interpolation=cv2.INTER_LINEAR)
@@ -122,10 +136,10 @@ def create_app():
         return Response(generate(),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
 
-    # Depth colourmap MJPEG stream — 5 Hz, small size to save CPU
-    # Rate: JetsonConfig.DEPTH_STREAM_FPS (5 Hz)
-    # Size: JetsonConfig.DEPTH_WIDTH x DEPTH_HEIGHT (320x180)
-    # Quality: JetsonConfig.DEPTH_JPEG_QUALITY (50)
+    # ── Depth colourmap MJPEG stream ─────────────────────────────────────────
+    # Rate: JetsonConfig.DEPTH_STREAM_FPS (4 Hz)
+    # Size: JetsonConfig.DEPTH_WIDTH × DEPTH_HEIGHT (320×180)
+    # Quality: JetsonConfig.DEPTH_JPEG_QUALITY (45)
     @app.route('/depth_feed')
     def depth_feed():
         cam_mgr = app.config.get('CAMERA_MANAGER')
@@ -133,17 +147,28 @@ def create_app():
             return "Camera not available", 404
 
         def generate():
-            _interval = 1.0 / JetsonConfig.DEPTH_STREAM_FPS   # 0.2 s at 5 Hz
+            _interval = 1.0 / JetsonConfig.DEPTH_STREAM_FPS   # 0.25 s at 4 Hz
             _w = JetsonConfig.DEPTH_WIDTH
             _h = JetsonConfig.DEPTH_HEIGHT
             _q = JetsonConfig.DEPTH_JPEG_QUALITY
+            _boundary = b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+            _last_sent = 0.0
+
             while True:
+                now = time.time()
+                elapsed = now - _last_sent
+                if elapsed < _interval:
+                    time.sleep(_interval - elapsed)
+                    now = time.time()
+
                 frames = cam_mgr.get_latest_frames()
                 # Prefer raw disparity; fallback to raw 16-bit depth
                 frame = frames.get('disp') if frames else None
                 if frame is not None:
                     if len(frame.shape) == 2:
                         # Colourise raw disparity on-demand
+                        if frame.dtype != np.uint8:
+                            frame = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                         frame = cv2.applyColorMap(frame, cv2.COLORMAP_HOT)
                 else:
                     raw = frames.get('depth') if frames else None
@@ -158,10 +183,9 @@ def create_app():
                     ret, jpeg = cv2.imencode('.jpg', frame,
                                              [cv2.IMWRITE_JPEG_QUALITY, _q])
                     if ret:
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n'
-                               + jpeg.tobytes() + b'--frame\r\n')
-                time.sleep(_interval)
+                        # Fixed: boundary only at start, not duplicated in body
+                        yield (_boundary + jpeg.tobytes() + b'\r\n')
+                        _last_sent = now
 
         return Response(generate(),
                         mimetype='multipart/x-mixed-replace; boundary=frame')

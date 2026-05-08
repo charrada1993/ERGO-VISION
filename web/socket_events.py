@@ -1,13 +1,20 @@
 # web/socket_events.py
 # Optimized for Jetson Orin: single camera, throttled skeleton/IMU emits,
-# conditional depth masking, and numpy import fix.
+# conditional depth masking, GIL-yielding sleep, and numpy import fix.
 import time
 import math
 import traceback
+import threading
 import numpy as np                       # ← was missing (caused NameError on depth masking)
 import cv2
 from flask_socketio import emit
 from config import JetsonConfig
+
+# Pre-import RiskAnalyzer at module load time (avoids repeated import overhead in loop)
+try:
+    from ergonomics.risk import RiskAnalyzer as _RiskAnalyzer
+except ImportError:
+    _RiskAnalyzer = None
 
 
 def _sanitize(obj):
@@ -79,7 +86,7 @@ class SocketEvents:
           4. Compute skeleton angles
           5. Calculate RULA + REBA scores
           6. Emit pose_update (throttled, max 5 Hz) and skeleton_3d (every Nth frame)
-          7. Log at interval
+          7. Log at interval (1 Hz, or every sample if recording)
         """
         print("[Processing] Thread started (single-camera, Jetson optimized)")
         last_log        = 0.0
@@ -88,10 +95,12 @@ class SocketEvents:
         self._frame_count = 0
 
         # Precompute throttle intervals from config
-        _skel_every  = JetsonConfig.SKELETON_EMIT_EVERY   # 3
-        _imu_every   = JetsonConfig.IMU_SAMPLE_EVERY      # 3
-        _mask_every  = JetsonConfig.DEPTH_MASK_EVERY      # 2
-        _min_emit_dt = 1.0 / 5.0                          # cap pose_update at 5 Hz
+        _skel_every  = JetsonConfig.SKELETON_EMIT_EVERY   # 4
+        _imu_every   = JetsonConfig.IMU_SAMPLE_EVERY      # 5
+        _mask_every  = JetsonConfig.DEPTH_MASK_EVERY      # 3
+        _min_emit_dt = 1.0 / JetsonConfig.POSE_UPDATE_MAX_HZ   # 0.2 s at 5 Hz
+        _loop_sleep  = JetsonConfig.PROCESS_LOOP_SLEEP    # 5 ms GIL yield
+        _log_interval = 1.0                               # log at 1 Hz (not 2 Hz)
         _STATUS_DT   = 5.0                                # print status at most every 5 s
         _last_rgb    = None                               # skip re-processing same frame
         _interval    = 0.125                              # fallback sleep (8 fps period)
@@ -122,7 +131,9 @@ class SocketEvents:
 
                 # ── 2. Depth masking (every _mask_every frames, skip frame 0) ──
                 masked_rgb = rgb
-                if depth_frame is not None and self._frame_count > 0 and (self._frame_count % _mask_every == 0):
+                if (depth_frame is not None and
+                        self._frame_count > 0 and
+                        (self._frame_count % _mask_every == 0)):
                     if depth_frame.shape == rgb.shape[:2]:
                         mask = ((depth_frame > 500) & (depth_frame < 3000)).astype(np.uint8)
                         masked_rgb = cv2.bitwise_and(rgb, rgb, mask=mask)
@@ -223,6 +234,8 @@ class SocketEvents:
                         }
                     self.socketio.emit('pose_update', _sanitize(payload))
                     last_emit = now
+                    # Yield GIL after emit so Flask/SocketIO threads can run
+                    time.sleep(_loop_sleep)
 
                 # ── 9. Emit skeleton_3d (every _skel_every frames) ────
                 if self._frame_count % _skel_every == 0 and skeleton_3d is not None:
@@ -231,26 +244,28 @@ class SocketEvents:
                         if hasattr(skeleton_3d, 'tolist') else skeleton_3d
                     })
 
-                # ── 10. Logging ───────────────────────────────────────
+                # ── 10. Logging (1 Hz background, or every frame if recording) ──
                 now = time.time()
-                should_log = self.is_recording or (now - last_log >= 0.5)
+                should_log = self.is_recording or (now - last_log >= _log_interval)
                 if should_log:
                     try:
-                        from ergonomics.risk import RiskAnalyzer
-                        vision_anoms = RiskAnalyzer.detect_anomalies(
-                            angles,
-                            rula_res.get('RULA_score', 0),
-                            reba_res.get('REBA_score', 0)
-                        )
+                        if _RiskAnalyzer is not None:
+                            vision_anoms = _RiskAnalyzer.detect_anomalies(
+                                angles,
+                                rula_res.get('RULA_score', 0),
+                                reba_res.get('REBA_score', 0)
+                            )
+                        else:
+                            vision_anoms = []
                         self.logger.log(angles, rula_res, reba_res,
                                         vision_anoms + anomalies)
-                    except Exception as log_err:
-                        pass   # logging errors are non-critical; don't print
+                    except Exception:
+                        pass   # logging errors are non-critical
                     if not self.is_recording:
                         last_log = now
 
-                # No sleep here — inference time (~50–100 ms) is the natural limiter.
-                # Adding extra sleep would drop below camera FPS unnecessarily.
+                # No extra sleep here — MediaPipe inference time
+                # (~50–120 ms on ARM Lite model) is the natural frame limiter.
 
             except Exception as e:
                 print(f"[Processing] ERROR: {e}")

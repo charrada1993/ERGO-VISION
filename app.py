@@ -1,10 +1,24 @@
 # app.py
 # Optimized for NVIDIA Jetson Orin reComputer J3011 (8 GB RAM, USB 2.0).
 # Single OAK-D camera only. All tuning constants live in JetsonConfig.
+import os
 import threading
 import depthai as dai
 from config import Config, JetsonConfig
 Config.ensure_dirs()
+
+
+def _mem_used_mb() -> float:
+    """Return current RSS memory usage in MB (reads /proc/meminfo)."""
+    try:
+        info = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, v = line.split(":", 1)
+                info[k.strip()] = int(v.strip().split()[0])
+        return (info["MemTotal"] - info["MemAvailable"]) / 1024
+    except Exception:
+        return 0.0
 
 from camera.manager import CameraManager
 from camera.imu_manager import IMUManager
@@ -37,7 +51,8 @@ def main():
 
     # ── 2. Create pipelines and initialize cameras ───────────────────────
     for idx, dev_info in enumerate(devices_info):
-        print(f"[Main] Initializing device {idx+1}/{num_cams}: {dev_info.getMxId()}")
+        dev_id = getattr(dev_info, 'getMxId', getattr(dev_info, 'getDeviceId', lambda: getattr(dev_info, 'name', 'Unknown')))()
+        print(f"[Main] Initializing device {idx+1}/{num_cams}: {dev_id}")
         pipeline = dai.Pipeline()
         cam_mgr = CameraManager(pipeline=pipeline)
         
@@ -109,8 +124,15 @@ def main():
     processing_thread.start()
 
     # ── 10. Run web server ────────────────────────────────────────────────
+    # use_reloader=False: avoids double-process on Jetson (wastes ~200 MB RAM)
+    # log_output=False:   silences per-request logs (saves ~5% CPU at 8 fps)
+    print("[Main] ─────────────────────────────────────────────")
+    print(f"[Main] RAM used: {_mem_used_mb():.0f} MB / 7607 MB")
+    print("[Main] Dashboard → http://0.0.0.0:5000")
+    print("[Main] ─────────────────────────────────────────────")
     try:
-        socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False,
+                     use_reloader=False, log_output=False)
     finally:
         print("[Main] Shutting down …")
         imu_mgr.stop()
