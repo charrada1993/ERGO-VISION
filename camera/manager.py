@@ -166,9 +166,9 @@ class CameraManager:
         Non-blocking frame drain loop.
         Uses tryGetAll() so we never block waiting for a frame – critical
         over USB 2.0 where latency spikes are common.
-        Sleep matches the camera FPS to prevent busy-waiting.
+        Poll at 20 ms (50 Hz) so a new frame (arriving at 8 Hz = every 125 ms)
+        is picked up within 20 ms of arrival instead of up to 125 ms.
         """
-        interval = 1.0 / FPS   # ~0.125 s at 8 fps
         while self.running:
             try:
                 # 1. RGB
@@ -192,7 +192,8 @@ class CameraManager:
                     with self._lock:
                         self.frame_disp = pkt.getFrame()    # uint8 disparity
 
-                time.sleep(interval)
+                # Poll at 20 ms – fast enough to catch 8-fps frames within 20 ms
+                time.sleep(0.020)
 
             except Exception as e:
                 if self.running:

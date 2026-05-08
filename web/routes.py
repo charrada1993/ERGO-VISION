@@ -90,25 +90,34 @@ def create_app():
             return "Camera not available", 404
 
         def generate():
-            _interval = 1.0 / JetsonConfig.CAMERA_FPS   # ~0.125 s at 8 fps
-            _w = JetsonConfig.VIDEO_WIDTH
-            _h = JetsonConfig.VIDEO_HEIGHT
-            _q = JetsonConfig.VIDEO_JPEG_QUALITY
+            # Stream at 320×240 — 43% fewer pixels than 416×320, much faster encode
+            _w = 320
+            _h = 240
+            _q = JetsonConfig.VIDEO_JPEG_QUALITY   # 55
+            _params = [cv2.IMWRITE_JPEG_QUALITY, _q]
+            _last_frame = None   # track last served frame to avoid re-encoding
+
             while True:
                 frames = cam_mgr.get_latest_frames()
                 frame  = frames.get('rgb') if frames else None
-                if frame is not None:
-                    # Resize only if camera output differs from stream size
-                    if frame.shape[1] != _w or frame.shape[0] != _h:
-                        frame = cv2.resize(frame, (_w, _h),
-                                           interpolation=cv2.INTER_LINEAR)
-                    ret, jpeg = cv2.imencode('.jpg', frame,
-                                             [cv2.IMWRITE_JPEG_QUALITY, _q])
-                    if ret:
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n'
-                               + jpeg.tobytes() + b'--frame\r\n')
-                time.sleep(_interval)
+
+                if frame is None or frame is _last_frame:
+                    # No new frame yet — micro-sleep and retry
+                    time.sleep(0.005)
+                    continue
+
+                _last_frame = frame
+
+                # Resize to stream resolution
+                if frame.shape[1] != _w or frame.shape[0] != _h:
+                    frame = cv2.resize(frame, (_w, _h),
+                                       interpolation=cv2.INTER_LINEAR)
+
+                ret, jpeg = cv2.imencode('.jpg', frame, _params)
+                if ret:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n'
+                           + jpeg.tobytes() + b'\r\n')
 
         return Response(generate(),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
