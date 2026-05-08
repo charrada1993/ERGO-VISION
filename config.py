@@ -45,7 +45,7 @@ class JetsonConfig:
     RGB_HEIGHT          = 320
 
     # 320P mono cameras (~213 KB/frame × 2 × 8 fps ≈ 3.4 MB/s stereo)
-    MONO_RESOLUTION     = "THE_320_P"
+    MONO_RESOLUTION     = "THE_400_P"  # Lowest valid DepthAI mono res (640x400)
 
     # StereoDepth post-processing – minimal to save ARM CPU cycles
     STEREO_SPECKLE_RANGE        = 50

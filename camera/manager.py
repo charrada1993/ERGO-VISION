@@ -14,8 +14,9 @@ from config import JetsonConfig
 FPS             = JetsonConfig.CAMERA_FPS          # 8 fps – USB2 safe
 RGB_SOCKET      = dai.CameraBoardSocket.CAM_A
 
-# Mono resolution: 320P  (~213 KB/frame × 2 sides × 8 fps ≈ 3.4 MB/s)
-MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_320_P
+# Mono resolution: THE_400_P (640×400) — lowest valid DepthAI mono resolution
+# NOTE: THE_320_P does not exist in the DepthAI SensorResolution enum.
+MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_400_P
 
 
 class CameraManager:
