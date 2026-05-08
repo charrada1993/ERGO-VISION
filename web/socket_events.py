@@ -78,37 +78,50 @@ class SocketEvents:
           3. Run MediaPipe pose estimation
           4. Compute skeleton angles
           5. Calculate RULA + REBA scores
-          6. Emit pose_update (every frame) and skeleton_3d (every Nth frame)
+          6. Emit pose_update (throttled, max 5 Hz) and skeleton_3d (every Nth frame)
           7. Log at interval
         """
         print("[Processing] Thread started (single-camera, Jetson optimized)")
-        last_log   = 0
+        last_log        = 0.0
+        last_emit       = 0.0
+        last_status_msg = 0.0        # time-based gate for status prints
         self._frame_count = 0
 
         # Precompute throttle intervals from config
         _skel_every  = JetsonConfig.SKELETON_EMIT_EVERY   # 3
         _imu_every   = JetsonConfig.IMU_SAMPLE_EVERY      # 3
         _mask_every  = JetsonConfig.DEPTH_MASK_EVERY      # 2
-        _interval    = 1.0 / JetsonConfig.CAMERA_FPS      # ~0.125 s at 8 fps
+        _min_emit_dt = 1.0 / 5.0                          # cap pose_update at 5 Hz
+        _STATUS_DT   = 5.0                                # print status at most every 5 s
+        _last_rgb    = None                               # skip re-processing same frame
 
         while self.running:
             try:
+                now = time.time()
+
                 # ── 1. Grab frame from the single camera ───────────────
                 mgr    = self.cam_managers[0]
                 frames = mgr.get_latest_frames()
                 rgb    = frames.get('rgb') if frames else None
 
                 if rgb is None:
-                    if self._frame_count % 60 == 0:
+                    if now - last_status_msg >= _STATUS_DT:
                         print("[Processing] Waiting for first camera frame …")
-                    time.sleep(0.05)
+                        last_status_msg = now
+                    time.sleep(0.020)
                     continue
+
+                # Skip if same frame object as last iteration (no new camera data)
+                if rgb is _last_rgb:
+                    time.sleep(0.010)
+                    continue
+                _last_rgb = rgb
 
                 depth_frame = frames.get('depth')
 
-                # ── 2. Depth masking (every _mask_every frames only) ────
+                # ── 2. Depth masking (every _mask_every frames, skip frame 0) ──
                 masked_rgb = rgb
-                if depth_frame is not None and (self._frame_count % _mask_every == 0):
+                if depth_frame is not None and self._frame_count > 0 and (self._frame_count % _mask_every == 0):
                     if depth_frame.shape == rgb.shape[:2]:
                         mask = ((depth_frame > 500) & (depth_frame < 3000)).astype(np.uint8)
                         masked_rgb = cv2.bitwise_and(rgb, rgb, mask=mask)
@@ -116,9 +129,10 @@ class SocketEvents:
                 # ── 3. Pose estimation ─────────────────────────────────
                 lm = self.pose_est.get_landmarks(masked_rgb)
                 if lm is None:
-                    if self._frame_count % 60 == 0:
-                        print("[Processing] No landmarks detected")
-                    time.sleep(0.05)
+                    if now - last_status_msg >= _STATUS_DT:
+                        print("[Processing] No person detected in frame")
+                        last_status_msg = now
+                    time.sleep(0.020)
                     continue
 
                 self._frame_count += 1
@@ -188,27 +202,28 @@ class SocketEvents:
                 if self._frame_count % _imu_every == 0 or self._imu_cache is None:
                     self._imu_cache = self._get_imu_data()
 
-                # ── 8. Emit pose_update (every frame) ────────────────
-                payload = {
-                    'angles':       angles,
-                    'rula':         rula_res.get('RULA_score', 0),
-                    'reba':         reba_res.get('REBA_score', 0),
-                    'risk_level':   rula_res.get('risk_level', 'Low'),
-                    'anomalies':    anomalies,
-                    'rula_details': rula_details,
-                    'reba_details': reba_details,
-                    'imu':          self._imu_cache,
-                }
-                if self.is_recording:
-                    payload['recording'] = {
-                        'is_recording': True,
-                        'samples': self.logger.sample_count
+                # ── 8. Emit pose_update (throttled to 5 Hz max) ───────
+                now = time.time()
+                if now - last_emit >= _min_emit_dt:
+                    payload = {
+                        'angles':       angles,
+                        'rula':         rula_res.get('RULA_score', 0),
+                        'reba':         reba_res.get('REBA_score', 0),
+                        'risk_level':   rula_res.get('risk_level', 'Low'),
+                        'anomalies':    anomalies,
+                        'rula_details': rula_details,
+                        'reba_details': reba_details,
+                        'imu':          self._imu_cache,
                     }
-
-                self.socketio.emit('pose_update', _sanitize(payload))
+                    if self.is_recording:
+                        payload['recording'] = {
+                            'is_recording': True,
+                            'samples': self.logger.sample_count
+                        }
+                    self.socketio.emit('pose_update', _sanitize(payload))
+                    last_emit = now
 
                 # ── 9. Emit skeleton_3d (every _skel_every frames) ────
-                # 33 × 3 floats per emit – not needed at full frame rate.
                 if self._frame_count % _skel_every == 0 and skeleton_3d is not None:
                     self.socketio.emit('skeleton_3d', {
                         'landmarks': skeleton_3d.tolist()
@@ -229,9 +244,12 @@ class SocketEvents:
                         self.logger.log(angles, rula_res, reba_res,
                                         vision_anoms + anomalies)
                     except Exception as log_err:
-                        print(f"[Processing] Logger error: {log_err}")
+                        pass   # logging errors are non-critical; don't print
                     if not self.is_recording:
                         last_log = now
+
+                # No sleep here — inference time (~50–100 ms) is the natural limiter.
+                # Adding extra sleep would drop below camera FPS unnecessarily.
 
             except Exception as e:
                 print(f"[Processing] ERROR: {e}")
