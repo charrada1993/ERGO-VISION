@@ -94,6 +94,7 @@ class SocketEvents:
         _min_emit_dt = 1.0 / 5.0                          # cap pose_update at 5 Hz
         _STATUS_DT   = 5.0                                # print status at most every 5 s
         _last_rgb    = None                               # skip re-processing same frame
+        _interval    = 0.125                              # fallback sleep (8 fps period)
 
         while self.running:
             try:
@@ -253,13 +254,8 @@ class SocketEvents:
 
             except Exception as e:
                 print(f"[Processing] ERROR: {e}")
-                traceback.print_exc()
                 # Prevent tight busy-loop on repeated errors
                 time.sleep(_interval)
-                continue
-
-            # Pace the loop to match camera frame rate
-            time.sleep(_interval)
 
     # ------------------------------------------------------------------
     def _get_imu_data(self):
