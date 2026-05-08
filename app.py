@@ -1,7 +1,9 @@
 # app.py
+# Optimized for NVIDIA Jetson Orin reComputer J3011 (8 GB RAM, USB 2.0).
+# Single OAK-D camera only. All tuning constants live in JetsonConfig.
 import threading
 import depthai as dai
-from config import Config
+from config import Config, JetsonConfig
 Config.ensure_dirs()
 
 from camera.manager import CameraManager
@@ -23,11 +25,11 @@ def main():
     if not devices_info:
         print("[Main] No OAK-D device found. Exiting.")
         return
-    
-    # Limit to 1 camera as requested
-    devices_info = devices_info[:1]
+
+    # Single camera only — USB 2.0 cannot sustain more than one OAK-D
+    devices_info = devices_info[:JetsonConfig.MAX_CAMERAS]   # MAX_CAMERAS = 1
     num_cams = len(devices_info)
-    print(f"[Main] Detected {num_cams} OAK-D device(s)")
+    print(f"[Main] Using {num_cams} OAK-D device (USB 2.0 mode, single-camera)")
 
     cam_managers = []
     devices = []

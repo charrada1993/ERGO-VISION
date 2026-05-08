@@ -1,10 +1,28 @@
+# requirements.txt — ERGO-VISION
+#
+# JETSON ORIN ARM64 INSTALLATION NOTES:
+# -----------------------------------------------------------------------
+# Do NOT use: pip install opencv-python  (no ARM64 wheel available)
+# Instead:
+#   sudo apt install python3-opencv       # System OpenCV (arm64 native)
+#   pip install opencv-python-headless    # Or headless pip wheel
+#
+# depthai: Use the official Luxonis installer:
+#   curl -fL https://docs.luxonis.com/projects/api/en/latest/install/ | bash
+#
+# mediapipe: Use the arm64 wheel from MediaPipe team:
+#   pip install mediapipe  (works on JetPack 5+ with Python 3.8-3.10)
+#
+# Install all other packages with:
+#   pip install -r requirements.txt
+# -----------------------------------------------------------------------
 depthai
 mediapipe
 flask
 flask-socketio
 pandas
 numpy
-opencv-python
+opencv-python-headless
 reportlab
 matplotlib
 simple-websocket

@@ -615,9 +615,10 @@ body.light-mode::after {
     display: none;
 }
 body.light-mode .navbar {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(20px);
 }
 body.light-mode .logo {
     background: linear-gradient(45deg, #0d7377, #1a3a5c);
@@ -634,12 +635,13 @@ body.light-mode .nav-links a.active {
     box-shadow: none;
 }
 body.light-mode .card {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.05), inset 0 0 0 1px rgba(255,255,255,0.4);
+    backdrop-filter: blur(24px);
 }
 body.light-mode .card::before {
-    display: none;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, transparent 60%);
 }
 body.light-mode .page-title {
     color: #1a3a5c;
@@ -658,8 +660,8 @@ body.light-mode .jr-label {
     color: #5d6d7e;
 }
 body.light-mode .sub-score {
-    background: rgba(0, 0, 0, 0.05);
-    border-color: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.5);
+    border-color: rgba(0, 0, 0, 0.04);
 }
 body.light-mode .theme-btn {
     background: rgba(0, 0, 0, 0.1);
@@ -676,9 +678,9 @@ body.light-mode .joint-readout {
     border-color: rgba(0, 0, 0, 0.1);
 }
 body.light-mode .action-text {
-    background: rgba(0, 0, 0, 0.05);
-    color: #2c3e50;
-    border-color: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 212, 255, 0.05);
+    color: #34495e;
+    border-color: rgba(0, 212, 255, 0.1);
 }
 body.light-mode .status-bar {
     background: rgba(255, 255, 255, 0.9);
@@ -689,11 +691,18 @@ body.light-mode .video-badge .vbadge {
     color: #2c3e50;
     border-color: rgba(0, 0, 0, 0.1);
 }
+body.light-mode .risk-chip { box-shadow: none; }
+body.light-mode .risk-chip.low { background: rgba(0, 229, 160, 0.1); color: #007a55; border-color: rgba(0, 229, 160, 0.2); }
+body.light-mode .risk-chip.medium { background: rgba(255, 201, 77, 0.1); color: #856404; border-color: rgba(255, 201, 77, 0.2); }
+body.light-mode .risk-chip.high,
+body.light-mode .risk-chip.critical { background: rgba(255, 77, 109, 0.1); color: #a94442; border-color: rgba(255, 77, 109, 0.2); }
+
 body.light-mode .anomaly-item {
-    background: rgba(255,77,109,0.05);
+    background: rgba(255, 77, 109, 0.05);
     color: #2c3e50;
+    border-color: rgba(255, 77, 109, 0.1);
 }
-body.light-mode .anomaly-ok { color: #0d7377; }
+body.light-mode .anomaly-ok { color: #0d7377; background: rgba(0,229,160,0.05); border-color: rgba(0,229,160,0.1); }
 body.light-mode .cam-info-item,
 body.light-mode .cam-mode-badge {
     background: rgba(0,0,0,0.05);

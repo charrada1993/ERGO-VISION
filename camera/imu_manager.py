@@ -1,6 +1,7 @@
 # camera/imu_manager.py
 # Visual IMU – derives orientation & motion from RGB camera optical flow.
 # No hardware IMU chip required.  Works with any OAK-D variant (including Lite).
+# Optimized for Jetson Orin over USB 2.0: half-res input, fewer tracked points.
 #
 # Approach:
 #   1. Lucas-Kanade sparse optical flow tracks good feature points frame-to-frame.
@@ -19,19 +20,22 @@ import time
 import math
 
 
-# ── Tuning constants ─────────────────────────────────────────────────────────
+# ── Tuning constants (Jetson Orin / USB2 optimized) ─────────────────────────
+from config import JetsonConfig
+
 _LK_PARAMS = dict(
-    winSize   = (21, 21),
+    winSize   = JetsonConfig.IMU_WIN_SIZE,        # (15,15) – was (21,21)
     maxLevel  = 3,
-    criteria  = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+    criteria  = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03),
 )
 _FEATURE_PARAMS = dict(
-    maxCorners   = 200,
-    qualityLevel = 0.01,
-    minDistance  = 10,
-    blockSize    = 7,
+    maxCorners   = JetsonConfig.IMU_MAX_CORNERS,   # 100 – was 200
+    qualityLevel = 0.02,
+    minDistance  = 12,
+    blockSize    = 5,
 )
-_REDETECT_INTERVAL = 10   # re-detect features every N frames
+_REDETECT_INTERVAL = JetsonConfig.IMU_REDETECT_INTERVAL  # 20 – was 10
+_HALF_RES          = JetsonConfig.IMU_HALF_RES            # resize input to half
 _EMA_ALPHA         = 0.3  # smoothing factor (0 = no update, 1 = no smoothing)
 _SCALE_ACCEL       = 0.02 # pixels/frame → pseudo m/s²  (display scale, not physical)
 _SCALE_GYRO        = 0.5  # rotation deg/frame → pseudo rad/s
@@ -102,15 +106,22 @@ class IMUManager:
     # Background optical-flow thread
     # ------------------------------------------------------------------
     def _reader(self):
+        _interval = 1.0 / JetsonConfig.CAMERA_FPS   # match camera FPS (8 fps)
         while self.running:
             try:
                 frames = self._cam_mgr.get_latest_frames()
                 rgb    = frames.get('rgb') if frames else None
                 if rgb is None:
-                    time.sleep(0.02)
+                    time.sleep(0.05)
                     continue
 
                 gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
+
+                # Halve the resolution before optical flow – cuts compute ~4×
+                if _HALF_RES:
+                    gray = cv2.resize(gray, (gray.shape[1] // 2, gray.shape[0] // 2),
+                                      interpolation=cv2.INTER_LINEAR)
+
                 self._process_frame(gray)
 
                 snapshot = self._make_snapshot()
@@ -124,7 +135,7 @@ class IMUManager:
                 if self.running:
                     print(f"[VisualIMU] Error: {e}")
 
-            time.sleep(1.0 / 15)   # Match the 15 FPS camera rate
+            time.sleep(_interval)
 
     # ------------------------------------------------------------------
     # Core optical-flow processing

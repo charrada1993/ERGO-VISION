@@ -93,16 +93,25 @@
       <!-- LEFT: charts + anomalies -->
       <div class="col-main">
 
-        <!-- Live RGB feed -->
+        <!-- Live RGB feed + skeleton canvas overlay -->
         <div class="card video-panel" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; margin-bottom: 1.25rem;">
           <div class="panel-header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
             <div class="panel-title"><i class="fas fa-video" style="color:var(--cyan)"></i> Live Assessment View</div>
             <div style="display:flex;gap:0.6rem;align-items:center">
                <span style="font-size: 0.7rem; color: var(--green);">●</span><span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">RGB</span>
+               <span id="skelToggleBtn" title="Toggle skeleton overlay"
+                 style="cursor:pointer;font-size:0.75rem;font-weight:600;padding:2px 8px;border-radius:20px;
+                        background:rgba(0,212,255,0.15);color:var(--cyan);border:1px solid var(--cyan);user-select:none;"
+               >SKEL ON</span>
             </div>
           </div>
-          <div style="position: relative; width: 100%; background: #000; display: flex; justify-content: center; align-items: center; min-height: 320px;">
-            <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed" style="width: 100%; height: auto; max-height: 480px; object-fit: contain;">
+          <!-- Video + canvas stacked via position:relative wrapper -->
+          <div id="videoWrapper" style="position:relative;width:100%;background:#000;display:flex;justify-content:center;align-items:center;min-height:320px;">
+            <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed"
+                 style="width:100%;height:auto;max-height:480px;object-fit:contain;display:block;">
+            <!-- Skeleton canvas — drawn in JS, sits on top of the img -->
+            <canvas id="skelCanvas"
+                    style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
           </div>
         </div>
 

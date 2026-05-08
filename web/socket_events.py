@@ -1,31 +1,39 @@
 # web/socket_events.py
+# Optimized for Jetson Orin: single camera, throttled skeleton/IMU emits,
+# conditional depth masking, and numpy import fix.
 import time
 import math
 import traceback
+import numpy as np                       # ← was missing (caused NameError on depth masking)
+import cv2
 from flask_socketio import emit
+from config import JetsonConfig
 
 
 class SocketEvents:
     def __init__(self, socketio, cam_managers, pose_est, pose_fusion,
                  skeleton, rula_calc, reba_calc, logger, app):
-        self.socketio   = socketio
-        self.cam_managers = cam_managers
-        self.pose_est   = pose_est
-        self.pose_fusion = pose_fusion
-        self.skeleton   = skeleton
-        self.rula_calc  = rula_calc
-        self.reba_calc  = reba_calc
-        self.logger     = logger
-        self.app        = app
-        self.running    = True
+        self.socketio     = socketio
+        self.cam_managers = cam_managers[:1]   # Single camera only
+        self.pose_est     = pose_est
+        self.pose_fusion  = pose_fusion
+        self.skeleton     = skeleton
+        self.rula_calc    = rula_calc
+        self.reba_calc    = reba_calc
+        self.logger       = logger
+        self.app          = app
+        self.running      = True
         self.is_recording = False
         self._frame_count = 0
+
+        # Cached IMU snapshot – only refreshed every N frames
+        self._imu_cache     = None
+        self._imu_cache_age = 0
 
         @socketio.on('connect')
         def handle_connect():
             print("[Socket] Client connected")
-            mode = len(self.cam_managers)
-            emit('config', {'mode': mode, 'usb3': True})
+            emit('config', {'mode': 1, 'usb3': False})   # USB 2.0, 1 camera
 
         @socketio.on('start_recording')
         def handle_start_recording():
@@ -44,74 +52,72 @@ class SocketEvents:
     # ──────────────────────────────────────────────────────────────────
     def process_loop(self):
         """
-        Background thread:
-          1. Grab the latest RGB frames from all CameraManagers
-          2. Run MediaPipe / pose estimator on each
-          3. Fuse landmarks and compute skeleton angles
-          4. Calculate RULA + REBA with sub-score details
-          5. Evaluate vision-based anomalies
-          6. Emit 'pose_update' and 'skeleton_3d' to clients
-          7. Log every 0.5 s
+        Background thread for the single-camera Jetson Orin pipeline:
+          1. Grab the latest RGB frame from the primary CameraManager
+          2. Optional depth-based person masking (every Nth frame only)
+          3. Run MediaPipe pose estimation
+          4. Compute skeleton angles
+          5. Calculate RULA + REBA scores
+          6. Emit pose_update (every frame) and skeleton_3d (every Nth frame)
+          7. Log at interval
         """
-        print("[Processing] Thread started")
+        print("[Processing] Thread started (single-camera, Jetson optimized)")
         last_log   = 0
         self._frame_count = 0
 
+        # Precompute throttle intervals from config
+        _skel_every  = JetsonConfig.SKELETON_EMIT_EVERY   # 3
+        _imu_every   = JetsonConfig.IMU_SAMPLE_EVERY      # 3
+        _mask_every  = JetsonConfig.DEPTH_MASK_EVERY      # 2
+        _interval    = 1.0 / JetsonConfig.CAMERA_FPS      # ~0.125 s at 8 fps
+
         while self.running:
             try:
-                # ── 1. Get latest frames & estimate poses ──────────────────
-                all_landmarks = []
-                depth_frame = None
+                # ── 1. Grab frame from the single camera ───────────────
+                mgr    = self.cam_managers[0]
+                frames = mgr.get_latest_frames()
+                rgb    = frames.get('rgb') if frames else None
 
-                for mgr in self.cam_managers:
-                    frames = mgr.get_latest_frames()
-                    rgb    = frames.get('rgb') if frames else None
-                    if frames and frames.get('depth') is not None and depth_frame is None:
-                        # Grab depth frame from the first available camera
-                        depth_frame = frames.get('depth')
-
-                    if rgb is not None:
-                        # OPTION 1: Depth-Based Masking
-                        # Only process pixels within the "working zone" (e.g., 0.5m to 3.0m)
-                        # This prevents MediaPipe from latching onto multiple people in the background
-                        masked_rgb = rgb
-                        if frames.get('depth') is not None:
-                            depth = frames.get('depth')
-                            if depth.shape == rgb.shape[:2]:
-                                # Efficient bitwise masking instead of array copy
-                                mask = ((depth > 500) & (depth < 3000)).astype(np.uint8)
-                                masked_rgb = cv2.bitwise_and(rgb, rgb, mask=mask)
-                                
-                        lm = self.pose_est.get_landmarks(masked_rgb)
-                        all_landmarks.append(lm)
-                    else:
-                        all_landmarks.append(None)
-                
-                # Check if at least one camera provided landmarks
-                if not any(lm is not None for lm in all_landmarks):
+                if rgb is None:
                     if self._frame_count % 60 == 0:
-                        print("[Processing] No landmarks detected from any camera")
+                        print("[Processing] Waiting for first camera frame …")
+                    time.sleep(0.05)
+                    continue
+
+                depth_frame = frames.get('depth')
+
+                # ── 2. Depth masking (every _mask_every frames only) ────
+                masked_rgb = rgb
+                if depth_frame is not None and (self._frame_count % _mask_every == 0):
+                    if depth_frame.shape == rgb.shape[:2]:
+                        mask = ((depth_frame > 500) & (depth_frame < 3000)).astype(np.uint8)
+                        masked_rgb = cv2.bitwise_and(rgb, rgb, mask=mask)
+
+                # ── 3. Pose estimation ─────────────────────────────────
+                lm = self.pose_est.get_landmarks(masked_rgb)
+                if lm is None:
+                    if self._frame_count % 60 == 0:
+                        print("[Processing] No landmarks detected")
                     time.sleep(0.05)
                     continue
 
                 self._frame_count += 1
 
-                # ── 2. Fuse + compute angles ──────────────────────────
-                skeleton_3d = self.pose_fusion.fuse(all_landmarks)
+                # ── 4. Fuse + compute angles ──────────────────────────
+                skeleton_3d = self.pose_fusion.fuse([lm])
                 if skeleton_3d is None:
                     continue
 
-                angles      = self.skeleton.compute_angles(skeleton_3d)
+                angles = self.skeleton.compute_angles(skeleton_3d)
 
-                # Enrich depth-aware angles if depth available
+                # Depth-enriched angles (optional)
                 if depth_frame is not None and hasattr(self.skeleton, 'enrich_with_depth'):
                     angles = self.skeleton.enrich_with_depth(angles, depth_frame)
 
-                # ── 3. RULA + REBA scores with details ────────────────
+                # ── 5. RULA + REBA ────────────────────────────────────
                 rula_res = self.rula_calc.compute(angles)
                 reba_res = self.reba_calc.compute(angles)
 
-                # Build sub-score detail dicts for the UI
                 rula_details = {
                     'upper_arm':   rula_res.get('upper_arm_score'),
                     'lower_arm':   rula_res.get('lower_arm_score'),
@@ -145,7 +151,7 @@ class SocketEvents:
                     'score_c':      reba_res.get('score_C'),
                 }
 
-                # ── 4. Vision-based angle anomalies ─────────────────
+                # ── 6. Anomaly detection ──────────────────────────────
                 anomalies = []
                 neck_angle  = angles.get('neck', 0)
                 trunk_angle = angles.get('trunk', 0)
@@ -158,7 +164,11 @@ class SocketEvents:
                 if ua_left > 90 or ua_right > 90:
                     anomalies.append("Shoulder elevated above 90°")
 
-                # ── 5. Emit Socket.IO update ──────────────────────────
+                # ── 7. IMU data (cached – refreshed every _imu_every frames) ──
+                if self._frame_count % _imu_every == 0 or self._imu_cache is None:
+                    self._imu_cache = self._get_imu_data()
+
+                # ── 8. Emit pose_update (every frame) ────────────────
                 payload = {
                     'angles':       angles,
                     'rula':         rula_res.get('RULA_score', 0),
@@ -167,7 +177,7 @@ class SocketEvents:
                     'anomalies':    anomalies,
                     'rula_details': rula_details,
                     'reba_details': reba_details,
-                    'imu':          self._get_imu_data(),
+                    'imu':          self._imu_cache,
                 }
                 if self.is_recording:
                     payload['recording'] = {
@@ -177,12 +187,15 @@ class SocketEvents:
 
                 self.socketio.emit('pose_update', payload)
 
-                if skeleton_3d is not None:
+                # ── 9. Emit skeleton_3d (every _skel_every frames) ────
+                # 33 × 3 floats per emit – not needed at full frame rate.
+                if self._frame_count % _skel_every == 0 and skeleton_3d is not None:
                     self.socketio.emit('skeleton_3d', {
-                        'landmarks': skeleton_3d.tolist() if hasattr(skeleton_3d, 'tolist') else skeleton_3d
+                        'landmarks': skeleton_3d.tolist()
+                        if hasattr(skeleton_3d, 'tolist') else skeleton_3d
                     })
 
-                # ── 6. Logging (Continuous if recording, periodic otherwise) ──
+                # ── 10. Logging ───────────────────────────────────────
                 now = time.time()
                 should_log = self.is_recording or (now - last_log >= 0.5)
                 if should_log:
@@ -204,8 +217,8 @@ class SocketEvents:
                 print(f"[Processing] ERROR: {e}")
                 traceback.print_exc()
 
-            # ~10 Hz processing rate
-            time.sleep(1.0 / 10)
+            # Pace the loop to match camera frame rate
+            time.sleep(_interval)
 
     # ------------------------------------------------------------------
     def _get_imu_data(self):

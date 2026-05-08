@@ -20,9 +20,16 @@ class DataLogger:
         self.session_path = os.path.join(Config.SESSION_DIR, filename)
         self.file = open(self.session_path, 'w', newline='')
         self.writer = csv.writer(self.file)
-        self.writer.writerow(["timestamp", "frame_id", "neck_deg", "trunk_deg", "upper_arm_deg",
-                              "elbow_deg", "wrist_deg", "RULA_score", "REBA_score",
-                              "risk_prediction", "anomalies"])
+        # Detailed columns including both sides
+        self.writer.writerow([
+            "timestamp", "frame_id", 
+            "neck_deg", "trunk_deg", 
+            "ua_left_deg", "ua_right_deg",
+            "el_left_deg", "el_right_deg", 
+            "wr_left_deg", "wr_right_deg",
+            "RULA_score", "REBA_score",
+            "risk_prediction", "anomalies"
+        ])
         self.start_time = time.time()
         self.sample_count = 0
         return filename
@@ -38,8 +45,11 @@ class DataLogger:
             round(angles.get('neck', 0), 2),
             round(angles.get('trunk', 0), 2),
             round(angles.get('upper_arm_left', 0), 2),
+            round(angles.get('upper_arm_right', 0), 2),
             round(angles.get('elbow_left', 0), 2),
+            round(angles.get('elbow_right', 0), 2),
             round(angles.get('wrist_left', 0), 2),
+            round(angles.get('wrist_right', 0), 2),
             rula_result.get('RULA_score', 0),
             reba_result.get('REBA_score', 0),
             rula_result.get('risk_level', 'Low'),

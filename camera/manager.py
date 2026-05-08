@@ -1,30 +1,39 @@
 # camera/manager.py
-# Improved: RGB + Stereo Depth (aligned) using DepthAI examples as reference.
-# Ref: examples/StereoDepth/rgb_depth_aligned.py
-# Ref: examples/StereoDepth/depth_post_processing.py
+# Optimized for NVIDIA Jetson Orin reComputer J3011 over USB 2.0.
+# USB 2.0 budget: ~60 MB/s real. We target <10 MB/s total for RGB+Depth.
+# Ref: depthai examples/StereoDepth/rgb_depth_aligned.py
 
 import depthai as dai
 import threading
 import time
 import numpy as np
 import cv2
+from config import JetsonConfig
 
-# Resolution for stereo cameras - 400P is much faster for depth on Jetson
-MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_400_P
+# ── Resolved tuning from JetsonConfig ─────────────────────────────────────────
+FPS             = JetsonConfig.CAMERA_FPS          # 8 fps – USB2 safe
 RGB_SOCKET      = dai.CameraBoardSocket.CAM_A
-FPS             = 15
+
+# Mono resolution: 320P  (~213 KB/frame × 2 sides × 8 fps ≈ 3.4 MB/s)
+MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_320_P
 
 
 class CameraManager:
+    """
+    Single-camera manager for one OAK-D device.
+    Streams RGB + aligned StereoDepth at USB2-safe rates.
+    All queues are non-blocking (size=1) to always serve the freshest frame.
+    """
+
     def __init__(self, pipeline=None, device=None):
-        self.pipeline = pipeline          # Shared pipeline from app.py
-        self.device   = device            # Shared device (set after pipeline start)
-        self.running  = False
+        self.pipeline    = pipeline    # Shared pipeline from app.py
+        self.device      = device      # Shared device (set after pipeline start)
+        self.running     = False
 
         # Latest frames – written by background thread, read by callers
-        self.frame_rgb   = None           # BGR numpy array from RGB camera
-        self.frame_depth = None           # 16-bit depth in mm (aligned to RGB)
-        self.frame_disp  = None           # Colourised disparity for visualisation
+        self.frame_rgb   = None        # BGR numpy array from RGB camera
+        self.frame_depth = None        # uint16 depth in mm (aligned to RGB)
+        self.frame_disp  = None        # raw disparity uint8 for visualisation
         self._lock       = threading.Lock()
 
         # StereoDepth node handle – needed at runtime to read maxDisparity
@@ -36,9 +45,9 @@ class CameraManager:
     # ------------------------------------------------------------------
     def setup(self):
         """
-        Add RGB camera, Left/Right mono cameras and StereoDepth to the
-        shared pipeline.  Depth output is aligned to the RGB frame so
-        every pixel has a valid depth value in the same coordinate space.
+        Configure the DepthAI pipeline for USB 2.0 operation.
+        Uses conservative resolutions and disables heavy post-processing
+        to stay within ARM CPU and USB bandwidth budgets.
         """
         if self.pipeline is None:
             print("[Camera] ERROR – no pipeline provided")
@@ -47,10 +56,10 @@ class CameraManager:
         # ── RGB camera ──────────────────────────────────────────────────
         cam_rgb = self.pipeline.create(dai.node.Camera)
         cam_rgb.setBoardSocket(RGB_SOCKET)
-        cam_rgb.setSize(640, 360)
+        cam_rgb.setSize(JetsonConfig.RGB_WIDTH, JetsonConfig.RGB_HEIGHT)
         cam_rgb.setFps(FPS)
 
-        # ── Mono cameras ────────────────────────────────────────────────
+        # ── Mono cameras (left / right) ─────────────────────────────────
         mono_left  = self.pipeline.create(dai.node.MonoCamera)
         mono_right = self.pipeline.create(dai.node.MonoCamera)
         mono_left.setResolution(MONO_RESOLUTION)
@@ -64,32 +73,37 @@ class CameraManager:
         stereo = self.pipeline.create(dai.node.StereoDepth)
         stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
 
-        # LR-check is REQUIRED for depth alignment to work correctly
+        # LR-check required for depth alignment
         stereo.setLeftRightCheck(True)
 
-        # Align depth map to the RGB camera frame
+        # Align depth map to the RGB camera coordinate space
         stereo.setDepthAlign(RGB_SOCKET)
 
-        # Median filter removes salt-and-pepper noise while preserving edges
-        stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
+        # Lightweight 3×3 median (7×7 is too CPU-heavy on ARM)
+        stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_3x3)
 
-        # Advanced post-processing (ref: depth_post_processing.py)
+        # Minimal post-processing – only speckle + spatial, NO temporal filter
+        # (temporalFilter is the most CPU-intensive post-process on ARM)
         cfg = stereo.initialConfig.get()
-        cfg.postProcessing.speckleFilter.enable        = True
-        cfg.postProcessing.speckleFilter.speckleRange  = 50
-        cfg.postProcessing.temporalFilter.enable       = True   # smooths over time
-        cfg.postProcessing.spatialFilter.enable        = True   # edge-preserving smoothing
-        cfg.postProcessing.spatialFilter.holeFillingRadius = 2
-        cfg.postProcessing.spatialFilter.numIterations = 1
-        cfg.postProcessing.thresholdFilter.minRange    = 300    # mm – ignore <30 cm
-        cfg.postProcessing.thresholdFilter.maxRange    = 8000   # mm – ignore >8 m
+        cfg.postProcessing.speckleFilter.enable       = True
+        cfg.postProcessing.speckleFilter.speckleRange = JetsonConfig.STEREO_SPECKLE_RANGE
+
+        cfg.postProcessing.temporalFilter.enable      = False  # DISABLED – saves ARM CPU
+
+        cfg.postProcessing.spatialFilter.enable            = True
+        cfg.postProcessing.spatialFilter.holeFillingRadius = JetsonConfig.STEREO_SPATIAL_RADIUS
+        cfg.postProcessing.spatialFilter.numIterations     = JetsonConfig.STEREO_SPATIAL_ITERATIONS
+
+        cfg.postProcessing.thresholdFilter.minRange = JetsonConfig.STEREO_DEPTH_MIN_MM
+        cfg.postProcessing.thresholdFilter.maxRange = JetsonConfig.STEREO_DEPTH_MAX_MM
         cfg.postProcessing.decimationFilter.decimationFactor = 1
         stereo.initialConfig.set(cfg)
 
-        # Keep a reference so we can read maxDisparity after device start
-        self._stereo = stereo
+        self._stereo = stereo  # keep reference for maxDisparity readback
 
         # ── XLink outputs ────────────────────────────────────────────────
+        # Non-blocking, size=1: device drops old frames before USB transfer,
+        # preventing any queue build-up over USB 2.0.
         xout_rgb   = self.pipeline.create(dai.node.XLinkOut)
         xout_depth = self.pipeline.create(dai.node.XLinkOut)
         xout_disp  = self.pipeline.create(dai.node.XLinkOut)
@@ -97,8 +111,6 @@ class CameraManager:
         xout_depth.setStreamName("depth")
         xout_disp.setStreamName("disp")
 
-        # Prevent frame build-up on the device side (ref: rgb_video.py example)
-        # Only the latest frame is kept; older ones are dropped before XLink transfer
         xout_rgb.input.setBlocking(False)
         xout_rgb.input.setQueueSize(1)
         xout_depth.input.setBlocking(False)
@@ -106,17 +118,17 @@ class CameraManager:
         xout_disp.input.setBlocking(False)
         xout_disp.input.setQueueSize(1)
 
-        # ── Linking ──────────────────────────────────────────────────────
+        # ── Node linking ─────────────────────────────────────────────────
         cam_rgb.video.link(xout_rgb.input)
         mono_left.out.link(stereo.left)
         mono_right.out.link(stereo.right)
         stereo.depth.link(xout_depth.input)       # raw 16-bit depth in mm
-        stereo.disparity.link(xout_disp.input)    # for colourised visualisation
+        stereo.disparity.link(xout_disp.input)    # raw disparity for visualisation
 
-        # Use calibration to set manual focus on RGB so it stays aligned to depth
-        # (done in start_streams once device is available)
-
-        print("[Camera] Pipeline configured: RGB 1280×720 + StereoDepth aligned")
+        print(
+            f"[Camera] Pipeline configured: RGB {JetsonConfig.RGB_WIDTH}×"
+            f"{JetsonConfig.RGB_HEIGHT} + StereoDepth 320P @ {FPS} fps | USB 2.0 mode"
+        )
         return True
 
     # ------------------------------------------------------------------
@@ -128,23 +140,14 @@ class CameraManager:
             print("[Camera] ERROR – no device provided")
             return
 
-        # Apply manual focus from calibration so depth stays properly aligned
-        # (mirrors the approach in rgb_depth_aligned.py)
-        try:
-            calib = self.device.readCalibration2()
-            lens_pos = calib.getLensPosition(RGB_SOCKET)
-            if lens_pos:
-                # Re-apply at runtime via InputQueue if supported
-                pass   # focus is set during pipeline build above; nothing extra needed
-        except Exception as e:
-            print(f"[Camera] Calibration read warning: {e}")
-
         # Cache maxDisparity for normalisation
         if self._stereo is not None:
-            self._max_disp = self._stereo.initialConfig.getMaxDisparity()
+            try:
+                self._max_disp = self._stereo.initialConfig.getMaxDisparity()
+            except Exception:
+                self._max_disp = 95.0  # safe default
 
-        # Non-blocking queues with size=1 – always return the freshest frame
-        # Device-side queue is also size=1 (set above), so lag is eliminated end-to-end
+        # Non-blocking host-side queues – always return the freshest frame
         self._q_rgb   = self.device.getOutputQueue("rgb",   maxSize=1, blocking=False)
         self._q_depth = self.device.getOutputQueue("depth", maxSize=1, blocking=False)
         self._q_disp  = self.device.getOutputQueue("disp",  maxSize=1, blocking=False)
@@ -152,44 +155,43 @@ class CameraManager:
         self.running = True
         t = threading.Thread(target=self._reader, daemon=True)
         t.start()
-        print(f"[Camera] Streaming: RGB + Depth @ {FPS} fps")
+        print(f"[Camera] Streaming: RGB + Depth @ {FPS} fps (USB 2.0)")
 
     # ------------------------------------------------------------------
     # Background reader thread
     # ------------------------------------------------------------------
     def _reader(self):
         """
-        Continuously drain the three output queues.
-        Uses non-blocking tryGetAll() and sleep to prevent any lag or blocking
-        on NVIDIA Orin and other platforms.
+        Non-blocking frame drain loop.
+        Uses tryGetAll() so we never block waiting for a frame – critical
+        over USB 2.0 where latency spikes are common.
+        Sleep matches the camera FPS to prevent busy-waiting.
         """
+        interval = 1.0 / FPS   # ~0.125 s at 8 fps
         while self.running:
             try:
                 # 1. RGB
                 packets = self._q_rgb.tryGetAll()
-                if len(packets) > 0:
+                if packets:
                     pkt = packets[-1]
                     with self._lock:
                         self.frame_rgb = pkt.getCvFrame()   # BGR uint8
-                
+
                 # 2. Depth
                 packets = self._q_depth.tryGetAll()
-                if len(packets) > 0:
+                if packets:
                     pkt = packets[-1]
                     with self._lock:
-                        self.frame_depth = pkt.getFrame()   # uint16, mm
-                
-                # 3. Disparity - Skip colour mapping in background thread to save CPU
-                # Let the depth_feed route handle colourisation on-demand.
+                        self.frame_depth = pkt.getFrame()   # uint16 mm
+
+                # 3. Disparity – store raw; colourise on-demand in routes.py
                 packets = self._q_disp.tryGetAll()
-                if len(packets) > 0:
+                if packets:
                     pkt = packets[-1]
-                    raw = pkt.getFrame()
                     with self._lock:
-                        self.frame_disp = raw               # raw disparity uint8
-                
-                # Wait a bit longer to match the 15 FPS rate and reduce CPU load
-                time.sleep(0.01)
+                        self.frame_disp = pkt.getFrame()    # uint8 disparity
+
+                time.sleep(interval)
 
             except Exception as e:
                 if self.running:
@@ -200,12 +202,12 @@ class CameraManager:
     # ------------------------------------------------------------------
     def get_latest_frames(self):
         """
-        Returns a dict with the most recent frames from all streams:
+        Returns a dict with the most recent frames:
             {
               'timestamp': float (Unix time),
-              'rgb':   np.ndarray | None   – BGR uint8, 1280×720
-              'depth': np.ndarray | None   – uint16 mm, aligned to RGB
-              'disp':  np.ndarray | None   – BGR uint8, colourised disparity
+              'rgb':   np.ndarray | None  – BGR uint8, 416×320
+              'depth': np.ndarray | None  – uint16 mm, aligned to RGB
+              'disp':  np.ndarray | None  – uint8, raw disparity
             }
         """
         with self._lock:
@@ -218,7 +220,7 @@ class CameraManager:
 
     def get_depth_at_point(self, x: int, y: int) -> float:
         """
-        Return the depth in metres at pixel (x, y) of the aligned depth map.
+        Return depth in metres at pixel (x, y) of the aligned depth map.
         Returns -1.0 if depth is unavailable or invalid.
         """
         with self._lock:
