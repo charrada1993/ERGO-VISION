@@ -38,13 +38,16 @@ class JetsonConfig:
     """
 
     # ── OAK-D Camera pipeline ──────────────────────────────────────────
+    # USB 2.0 constraint: only one OAK-D device can be used at a time.
+    MAX_CAMERAS         = 1           # USB 2.0 cannot sustain more than one OAK-D
+
     # USB 2.0 constraint: keep RGB small to avoid saturating the bus.
     # 416×320 @ 8 fps = ~4 MB/s for RGB (comfortably within USB2 budget)
     CAMERA_FPS          = 8           # fps for RGB + mono cameras
     RGB_WIDTH           = 416         # pixels – USB2-safe resolution
     RGB_HEIGHT          = 320
 
-    # 320P mono cameras (~213 KB/frame × 2 × 8 fps ≈ 3.4 MB/s stereo)
+    # THE_400_P (640×400) — lowest valid DepthAI mono resolution; THE_320_P does not exist
     MONO_RESOLUTION     = "THE_400_P"  # Lowest valid DepthAI mono res (640x400)
 
     # StereoDepth post-processing – minimal to save ARM CPU cycles

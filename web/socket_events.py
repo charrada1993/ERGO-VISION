@@ -10,6 +10,26 @@ from flask_socketio import emit
 from config import JetsonConfig
 
 
+def _sanitize(obj):
+    """
+    Recursively convert numpy scalar / array types to plain Python primitives
+    so that flask-socketio's JSON encoder never raises TypeError.
+    """
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
 class SocketEvents:
     def __init__(self, socketio, cam_managers, pose_est, pose_fusion,
                  skeleton, rula_calc, reba_calc, logger, app):
@@ -185,7 +205,7 @@ class SocketEvents:
                         'samples': self.logger.sample_count
                     }
 
-                self.socketio.emit('pose_update', payload)
+                self.socketio.emit('pose_update', _sanitize(payload))
 
                 # ── 9. Emit skeleton_3d (every _skel_every frames) ────
                 # 33 × 3 floats per emit – not needed at full frame rate.
@@ -216,6 +236,9 @@ class SocketEvents:
             except Exception as e:
                 print(f"[Processing] ERROR: {e}")
                 traceback.print_exc()
+                # Prevent tight busy-loop on repeated errors
+                time.sleep(_interval)
+                continue
 
             # Pace the loop to match camera frame rate
             time.sleep(_interval)
