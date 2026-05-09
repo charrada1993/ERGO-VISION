@@ -242,8 +242,7 @@ git clone https://github.com/charrada1993/ERGO-VISION.git
 cd ERGO-VISION
 ```
 
-### 2. Create a virtual environment
-
+2. **Initialize Environment**:
 ```bash
 python3 -m venv venv
 source venv/bin/activate          # Linux / macOS
