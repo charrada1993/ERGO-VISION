@@ -64,13 +64,13 @@ class CameraCalibration:
             d_left = cal.getDistortionCoefficients(dai.CameraBoardSocket.CAM_B)
             obj.left_distortion = np.array(d_left, dtype=np.float64)
 
-            # Stereo extrinsics
-            R_list, T_list = cal.getCameraExtrinsics(
+            # Stereo extrinsics (returns 4x4 matrix in recent DepthAI)
+            ext = np.array(cal.getCameraExtrinsics(
                 dai.CameraBoardSocket.CAM_B,
                 dai.CameraBoardSocket.CAM_A
-            )
-            obj.R = np.array(R_list, dtype=np.float64)
-            obj.T = np.array(T_list, dtype=np.float64).flatten()
+            ), dtype=np.float64)
+            obj.R = ext[:3, :3]
+            obj.T = ext[:3, 3].flatten()
 
             # Baseline from translation norm (convert cm → m)
             obj.baseline_m = float(np.linalg.norm(obj.T)) / 100.0

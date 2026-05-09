@@ -33,6 +33,8 @@
             <a href="/rula"><i class="fas fa-person-rays"></i><span>RULA</span></a>
             <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
             <a href="/3d" class="active"><i class="fas fa-cube"></i><span>3D View</span></a>
+            <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
+            <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
         </div>
         <div class="nav-right">
             <div class="live-dot" id="liveStatus">LIVE</div>
@@ -90,7 +92,7 @@
         const btn = document.getElementById('themeBtn');
         function applyTheme(isLight) {
             document.body.classList.toggle('light-mode', isLight);
-            btn.innerHTML = isLight ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+            btn.innerHTML = isLight ? '☀️' : '🌙';
             localStorage.setItem('ergo-theme', isLight ? 'light' : 'dark');
         }
         btn.addEventListener('click', () => applyTheme(!document.body.classList.contains('light-mode')));

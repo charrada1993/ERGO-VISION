@@ -60,7 +60,8 @@ def main():
         # Note: IMU logic removed per vision-only mode requirement
         
         try:
-            device = dai.Device(pipeline, dev_info)
+            # Explicitly set HIGH speed for USB 2.0 stability on Jetson
+            device = dai.Device(pipeline, dev_info, dai.UsbSpeed.HIGH)
         except Exception as e:
             print(f"[Main] Pipeline start failed for device {dev_info.getMxId()}: {e}")
             continue
@@ -132,7 +133,7 @@ def main():
     print("[Main] ─────────────────────────────────────────────")
     try:
         socketio.run(app, host='0.0.0.0', port=5000, debug=False,
-                     use_reloader=False, log_output=False)
+                     use_reloader=False, log_output=False, allow_unsafe_werkzeug=True)
     finally:
         print("[Main] Shutting down …")
         imu_mgr.stop()

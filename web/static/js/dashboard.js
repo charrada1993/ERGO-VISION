@@ -329,7 +329,7 @@ function setJR(id, angle) {
 const themeBtn = document.getElementById('themeBtn');
 function applyTheme(isLight) {
   document.body.classList.toggle('light-mode', isLight);
-  themeBtn.innerHTML = isLight ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+  themeBtn.innerHTML = isLight ? '☀️' : '🌙';
   localStorage.setItem('ergo-theme', isLight ? 'light' : 'dark');
 }
 themeBtn.addEventListener('click', () => {

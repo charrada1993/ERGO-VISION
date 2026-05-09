@@ -44,14 +44,14 @@ class JetsonConfig:
     # USB 2.0 constraint: keep RGB small to avoid saturating the bus.
     # 640×360 @ 8 fps = ~5.5 MB/s for RGB (comfortably within USB2 budget)
     CAMERA_FPS          = 8           # fps for RGB + mono cameras
-    RGB_WIDTH           = 640         # 16:9 aspect ratio prevents center-crop zoom
-    RGB_HEIGHT          = 360
+    RGB_WIDTH           = 1280
+    RGB_HEIGHT          = 720
 
     # THE_400_P (640×400) — lowest valid DepthAI mono resolution; THE_320_P does not exist
     MONO_RESOLUTION     = "THE_400_P"  # Lowest valid DepthAI mono res (640x400)
 
     # StereoDepth post-processing – minimal to save ARM CPU cycles
-    STEREO_SPECKLE_RANGE        = 50
+    STEREO_SPECKLE_RANGE        = 28          # was 50; reduced to fit OAK-D memory
     STEREO_SPATIAL_RADIUS       = 2
     STEREO_SPATIAL_ITERATIONS   = 1
     STEREO_TEMPORAL_ENABLE      = False   # Disabled: CPU-intensive on ARM
@@ -81,8 +81,8 @@ class JetsonConfig:
 
     # ── MJPEG streaming ───────────────────────────────────────────────
     VIDEO_JPEG_QUALITY  = 50          # 0-100 (was 55; lower = faster encode on ARM)
-    VIDEO_WIDTH         = 320         # stream at 320×240 — 43% fewer pixels than 416×320
-    VIDEO_HEIGHT        = 240
+    VIDEO_WIDTH         = 640         # 16:9 stream resolution
+    VIDEO_HEIGHT        = 360
     VIDEO_STREAM_FPS    = 8           # explicit FPS cap for MJPEG generator
     DEPTH_JPEG_QUALITY  = 45          # depth map quality (was 50)
     DEPTH_WIDTH         = 320

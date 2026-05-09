@@ -58,8 +58,8 @@ class CameraManager:
         cam_rgb = self.pipeline.create(dai.node.ColorCamera)
         cam_rgb.setBoardSocket(RGB_SOCKET)
         cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
-        # Scale 1080p down by 1/3 -> 640x360 (preserves 16:9 FOV, NO zoom/crop)
-        cam_rgb.setIspScale(1, 3)
+        # Scale 1080p down by 2/3 -> 1280x720 (preserves 16:9 FOV, NO zoom/crop)
+        cam_rgb.setIspScale(2, 3)
         cam_rgb.setVideoSize(JetsonConfig.RGB_WIDTH, JetsonConfig.RGB_HEIGHT)
         cam_rgb.setFps(FPS)
 

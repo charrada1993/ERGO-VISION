@@ -26,6 +26,8 @@
       <a href="/rula" class="active"><i class="fas fa-person-rays"></i><span>RULA</span></a>
       <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
       <a href="/3d"><i class="fas fa-cube"></i><span>3D View</span></a>
+      <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
+      <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
     </div>
     <div class="nav-right">
       <div class="live-dot">LIVE</div>
@@ -367,12 +369,29 @@
       push(cWrist, +(a.wrist_left || a.wrist || 0));
     });
 
-    // Theme toggle
+    function updateChartsTheme(isLight) {
+      const gridCol = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)';
+      const tickCol = isLight ? '#5d6d7e' : '#6b7a99';
+      const allCharts = [rulaHistChart, cArm, cNeck, cForearm, cWrist];
+      allCharts.forEach(c => {
+        if (!c) return;
+        Object.values(c.options.scales).forEach(s => {
+          if (s.grid) s.grid.color = gridCol;
+          if (s.ticks) s.ticks.color = tickCol;
+        });
+        if (c.options.plugins && c.options.plugins.legend && c.options.plugins.legend.labels) {
+          c.options.plugins.legend.labels.color = tickCol;
+        }
+        c.update('none');
+      });
+    }
+
     const btn = document.getElementById('themeBtn');
     function applyTheme(isLight) {
       document.body.classList.toggle('light-mode', isLight);
-      btn.innerHTML = isLight ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+      btn.innerHTML = isLight ? '☀️' : '🌙';
       localStorage.setItem('ergo-theme', isLight ? 'light' : 'dark');
+      updateChartsTheme(isLight);
     }
     btn.addEventListener('click', () => applyTheme(!document.body.classList.contains('light-mode')));
     applyTheme(localStorage.getItem('ergo-theme') === 'light');

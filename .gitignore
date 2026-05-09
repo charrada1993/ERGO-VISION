@@ -44,3 +44,6 @@ web/static/temp_plot.png
 # OS
 .DS_Store
 Thumbs.db
+# Project specific
+backend.log
+.cache/
