@@ -129,17 +129,25 @@ class SocketEvents:
 
                 depth_frame = frames.get('depth')
 
-                # ── 2. Depth masking (every _mask_every frames, skip frame 0) ──
-                masked_rgb = rgb
-                if (depth_frame is not None and
-                        self._frame_count > 0 and
-                        (self._frame_count % _mask_every == 0)):
-                    if depth_frame.shape == rgb.shape[:2]:
-                        mask = ((depth_frame > 500) & (depth_frame < 3000)).astype(np.uint8)
-                        masked_rgb = cv2.bitwise_and(rgb, rgb, mask=mask)
+                # ── 2. Resize + Depth masking (stable landmarks, every frame) ──
+                # Optimization: Resize to MediaPipe resolution (320x180) BEFORE masking
+                # This saves massive CPU compared to masking at 720p.
+                _inf_w = JetsonConfig.POSE_INPUT_WIDTH   # 320
+                _inf_h = JetsonConfig.POSE_INPUT_HEIGHT  # 180
+                
+                small_rgb = cv2.resize(rgb, (_inf_w, _inf_h), interpolation=cv2.INTER_LINEAR)
+                
+                if depth_frame is not None:
+                    # Resize depth to match small_rgb
+                    small_depth = cv2.resize(depth_frame, (_inf_w, _inf_h), interpolation=cv2.INTER_NEAREST)
+                    # Create mask (person within 0.5m to 3.5m)
+                    mask = ((small_depth > 500) & (small_depth < 3500)).astype(np.uint8)
+                    masked_small_rgb = cv2.bitwise_and(small_rgb, small_rgb, mask=mask)
+                else:
+                    masked_small_rgb = small_rgb
 
                 # ── 3. Pose estimation ─────────────────────────────────
-                lm = self.pose_est.get_landmarks(masked_rgb)
+                lm = self.pose_est.get_landmarks(masked_small_rgb)
                 if lm is None:
                     if now - last_status_msg >= _STATUS_DT:
                         print("[Processing] No person detected in frame")
@@ -154,13 +162,14 @@ class SocketEvents:
                 if skeleton_3d is None:
                     continue
 
+                # ── 5. RULA + REBA ────────────────────────────────────
                 angles = self.skeleton.compute_angles(skeleton_3d)
 
-                # Depth-enriched angles (optional)
+                # Depth-enriched angles (EMA smoothing + coordinate correction)
                 if depth_frame is not None and hasattr(self.skeleton, 'enrich_with_depth'):
-                    angles = self.skeleton.enrich_with_depth(angles, depth_frame)
+                    calib = self.app.config.get('CALIBRATION')
+                    angles = self.skeleton.enrich_with_depth(angles, depth_frame, calib=calib)
 
-                # ── 5. RULA + REBA ────────────────────────────────────
                 rula_res = self.rula_calc.compute(angles)
                 reba_res = self.reba_calc.compute(angles)
 

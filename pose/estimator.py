@@ -42,8 +42,11 @@ class PoseEstimator:
         if frame is None:
             return None
 
-        # ── Resize before inference (biggest single CPU saving) ─────────
-        small = cv2.resize(frame, (_INF_W, _INF_H), interpolation=cv2.INTER_LINEAR)
+        # ── Resize before inference if needed (biggest single CPU saving) ──
+        if frame.shape[1] != _INF_W or frame.shape[0] != _INF_H:
+            small = cv2.resize(frame, (_INF_W, _INF_H), interpolation=cv2.INTER_LINEAR)
+        else:
+            small = frame
 
         # MediaPipe requires RGB
         rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)

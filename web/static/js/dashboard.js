@@ -21,7 +21,7 @@ const C = {
 };
 
 // ── Shared chart helpers ──────────────────────────────────
-const MAX_POINTS = 60;
+const MAX_POINTS = 45; // reduced from 60 to solve dashboard lag
 
 function makeTimestamp() {
   return new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -449,8 +449,12 @@ const DRAW_JOINTS = [
 function syncCanvasSize() {
   const rect = videoImg.getBoundingClientRect();
   if (rect.width > 0 && rect.height > 0) {
+    // Internal coordinate resolution
     skelCanvas.width  = rect.width;
     skelCanvas.height = rect.height;
+    // CSS display size (ensures grid alignment matches image exactly)
+    skelCanvas.style.width  = rect.width + 'px';
+    skelCanvas.style.height = rect.height + 'px';
   }
 }
 

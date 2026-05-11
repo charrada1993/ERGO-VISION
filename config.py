@@ -64,27 +64,28 @@ class JetsonConfig:
     POSE_INPUT_WIDTH    = 320
     POSE_INPUT_HEIGHT   = 180
 
-    # ── Visual IMU (optical flow) ──────────────────────────────────────
-    IMU_MAX_CORNERS     = 100         # was 200
-    IMU_WIN_SIZE        = (15, 15)    # was (21, 21)
-    IMU_REDETECT_INTERVAL = 20        # re-detect features every N frames
-    IMU_HALF_RES        = True        # resize frame to half before flow
+    # ── Legacy IMU settings (for module integrity only) ────────────────
+    IMU_MAX_CORNERS     = 100
+    IMU_WIN_SIZE        = (15, 15)
+    IMU_REDETECT_INTERVAL = 20
+    IMU_HALF_RES        = True
+    IMU_SAMPLE_EVERY     = 8
+
+    # ── MJPEG Stream settings (Jetson optimized) ──────────────────────
+    VIDEO_WIDTH         = 480         # 16:9 dashboard stream (was 640)
+    VIDEO_HEIGHT        = 270
+    VIDEO_JPEG_QUALITY  = 40          # 0-100 (was 55; lower = faster encode on ARM)
+    VIDEO_STREAM_FPS    = 8           # explicit FPS cap for MJPEG generator
+    
+    DEPTH_WIDTH         = 320         # 16:9 depth stream
+    DEPTH_HEIGHT        = 180
+    DEPTH_JPEG_QUALITY  = 40          # depth map quality (was 50)
+    DEPTH_STREAM_FPS    = 4           # Hz – depth colormap is CPU-heavy (was 8)
 
     # ── Socket.IO emit throttling ──────────────────────────────────────
-    SKELETON_EMIT_EVERY  = 4          # emit skeleton_3d every N frames (was 3)
-    IMU_SAMPLE_EVERY     = 5          # re-sample IMU every N frames (was 3)
-    DEPTH_MASK_EVERY     = 3          # apply depth mask every N frames (was 2)
+    SKELETON_EMIT_EVERY  = 2          # emit skeleton_3d every N frames (4 Hz)
+    POSE_UPDATE_MAX_HZ   = 4          # hard cap on pose_update events (Hz)
+    DEPTH_MASK_EVERY     = 1          # apply depth mask every N frames (stable landmarks)
 
     # ── Process loop timing ───────────────────────────────────────────
     PROCESS_LOOP_SLEEP   = 0.005      # yield GIL after successful emit (5 ms)
-    POSE_UPDATE_MAX_HZ   = 5          # hard cap on pose_update Socket.IO events
-
-    # ── MJPEG streaming ───────────────────────────────────────────────
-    VIDEO_JPEG_QUALITY  = 50          # 0-100 (was 55; lower = faster encode on ARM)
-    VIDEO_WIDTH         = 640         # 16:9 stream resolution
-    VIDEO_HEIGHT        = 360
-    VIDEO_STREAM_FPS    = 8           # explicit FPS cap for MJPEG generator
-    DEPTH_JPEG_QUALITY  = 45          # depth map quality (was 50)
-    DEPTH_WIDTH         = 320
-    DEPTH_HEIGHT        = 180
-    DEPTH_STREAM_FPS    = 4           # Hz – depth colormap is CPU-heavy (was 5)

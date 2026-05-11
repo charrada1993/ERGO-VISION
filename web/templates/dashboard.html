@@ -105,13 +105,13 @@
                >SKEL ON</span>
             </div>
           </div>
-          <!-- Video + canvas stacked via position:relative wrapper -->
-          <div id="videoWrapper" style="position:relative;width:100%;background:#000;display:flex;justify-content:center;align-items:center;min-height:320px;">
+          <!-- Video + canvas stacked via CSS Grid for perfect alignment -->
+          <div id="videoWrapper" style="display:grid; place-items:center; width:100%; background:#000; min-height:320px; position:relative; overflow:hidden;">
             <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed"
-                 style="width:100%;height:auto;max-height:480px;object-fit:contain;display:block;">
+                 style="grid-area:1/1; width:100%; height:auto; max-height:480px; display:block;">
             <!-- Skeleton canvas — drawn in JS, sits on top of the img -->
             <canvas id="skelCanvas"
-                    style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+                    style="grid-area:1/1; width:100%; height:100%; pointer-events:none; z-index:2;"></canvas>
           </div>
         </div>
 

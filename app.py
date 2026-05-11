@@ -81,12 +81,13 @@ def main():
     # Update num_cams based on successfully initialized devices
     num_cams = len(cam_managers)
 
-    # ── 2b. Visual IMU (optical-flow based, no hardware IMU needed) ──────
-    imu_mgr = IMUManager()
-    imu_mgr.setup()
-    imu_mgr.set_camera_manager(cam_managers[0])   # uses primary camera RGB frames
-    imu_mgr.start()
-    print(f"[Main] {num_cams} device(s) successfully started and streaming")
+    # ── 2b. Visual IMU (optical-flow based, disabled to solve dashboard lag) ──────
+    # imu_mgr = IMUManager()
+    # imu_mgr.setup()
+    # imu_mgr.set_camera_manager(cam_managers[0])   # uses primary camera RGB frames
+    # imu_mgr.start()
+    imu_mgr = None
+    print("[Main] Visual IMU disabled (CPU optimization)")
 
     # ── 3. Pose components ────────────────────────────────────────────────
     pose_est   = PoseEstimator()

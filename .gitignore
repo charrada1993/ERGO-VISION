@@ -47,3 +47,7 @@ Thumbs.db
 # Project specific
 backend.log
 .cache/
+ai/data/
+ai/models/
+ai/__pycache__/
+docs/__pycache__/
