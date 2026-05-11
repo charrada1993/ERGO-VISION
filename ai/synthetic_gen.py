@@ -62,6 +62,9 @@ def generate_ergonomic_dataset(num_samples=10000):
         if trunk_flex > 20: rula_score += 2
         if ua_flex_l > 45: rula_score += 2
         
+        row['RULA_score'] = rula_score
+        row['REBA_score'] = rula_score * 1.5 # Placeholder for REBA logic
+        
         # Add the 100+ parameters (placeholders for training)
         for i in range(24): row[f'angle_{i}'] = np.random.uniform(0, 1)
         for i in range(80): row[f'score_{i}'] = np.random.uniform(0, 1)

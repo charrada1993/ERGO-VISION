@@ -54,6 +54,10 @@ def create_app():
     def report_page():
         return render_template('report.html')
 
+    @app.route('/ai')
+    def ai_page():
+        return render_template('ai.html')
+
     # API routes
     @app.route('/api/config')
     def api_config():
@@ -84,6 +88,15 @@ def create_app():
                              download_name=os.path.basename(pdf_path))
         except Exception as e:
             return f"Error generating report: {str(e)}", 500
+
+    @app.route('/api/training_log')
+    def api_training_log():
+        log_path = os.path.join(Config.BASE_DIR, 'ai', 'data', 'training_log.json')
+        if not os.path.exists(log_path):
+            return jsonify([])
+        with open(log_path, 'r') as f:
+            import json
+            return jsonify(json.load(f))
 
     # ── RGB MJPEG stream ─────────────────────────────────────────────────────
     # Rate cap: JetsonConfig.VIDEO_STREAM_FPS (8 fps)

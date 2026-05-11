@@ -16,6 +16,11 @@ try:
 except ImportError:
     _RiskAnalyzer = None
 
+try:
+    from ai.operation.inference import NumpyInference
+except ImportError:
+    NumpyInference = None
+
 
 def _sanitize(obj):
     """
@@ -52,6 +57,14 @@ class SocketEvents:
         self.running      = True
         self.is_recording = False
         self._frame_count = 0
+
+        # AI Model initialization
+        self.ai_model = None
+        if NumpyInference:
+            try:
+                self.ai_model = NumpyInference()
+            except Exception as e:
+                print(f"[Socket] AI Model load failed: {e}")
 
         # Cached IMU snapshot – only refreshed every N frames
         self._imu_cache     = None
@@ -206,6 +219,21 @@ class SocketEvents:
                     'score_c':      reba_res.get('score_C'),
                 }
 
+                # ── 5b. AI Inference (Version 2) ──────────────────────
+                ai_results = None
+                if self.ai_model:
+                    try:
+                        if hasattr(self.ai_model, 'version') and self.ai_model.version == '2.0':
+                            ai_results = self.ai_model.predict(angles)
+                        else:
+                            ai_results = self.ai_model.predict(lm)
+                    except Exception as e:
+                        # Fallback for version check if attribute is missing
+                        try:
+                            ai_results = self.ai_model.predict(lm)
+                        except:
+                            pass
+
                 # ── 6. Anomaly detection ──────────────────────────────
                 anomalies = []
                 neck_angle  = angles.get('neck', 0)
@@ -235,6 +263,7 @@ class SocketEvents:
                         'rula_details': rula_details,
                         'reba_details': reba_details,
                         'imu':          self._imu_cache,
+                        'ai_results':   ai_results,
                     }
                     if self.is_recording:
                         payload['recording'] = {

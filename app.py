@@ -21,6 +21,7 @@ def _mem_used_mb() -> float:
         return 0.0
 
 from camera.manager import CameraManager
+from camera.mock_manager import MockCameraManager
 from camera.imu_manager import IMUManager
 from camera.calibration import CameraCalibration
 from pose.estimator import PoseEstimator
@@ -36,9 +37,13 @@ from web.socket_events import SocketEvents
 def main():
     # ── 1. Detect devices ─────────────────────────────────────────────────
     devices_info = dai.Device.getAllAvailableDevices()
-    if not devices_info:
-        print("[Main] No OAK-D device found. Exiting.")
-        return
+    force_sim = os.environ.get('FORCE_SIMULATION', '0') == '1'
+
+    if not devices_info or force_sim:
+        print("[Main] No OAK-D device found or Simulation forced. Entering SIMULATION MODE.")
+        use_mock = True
+    else:
+        use_mock = False
 
     # Single camera only — USB 2.0 cannot sustain more than one OAK-D
     devices_info = devices_info[:JetsonConfig.MAX_CAMERAS]   # MAX_CAMERAS = 1
@@ -46,33 +51,41 @@ def main():
     print(f"[Main] Using {num_cams} OAK-D device (USB 2.0 mode, single-camera)")
 
     cam_managers = []
-    devices = []
+    devices      = []
     calibrations = []
 
-    # ── 2. Create pipelines and initialize cameras ───────────────────────
-    for idx, dev_info in enumerate(devices_info):
-        dev_id = getattr(dev_info, 'getMxId', getattr(dev_info, 'getDeviceId', lambda: getattr(dev_info, 'name', 'Unknown')))()
-        print(f"[Main] Initializing device {idx+1}/{num_cams}: {dev_id}")
-        pipeline = dai.Pipeline()
-        cam_mgr = CameraManager(pipeline=pipeline)
-        
-        cam_mgr.setup()   # RGB + StereoDepth (aligned)
-        # Note: IMU logic removed per vision-only mode requirement
-        
-        try:
-            # Explicitly set HIGH speed for USB 2.0 stability on Jetson
-            device = dai.Device(pipeline, dev_info, dai.UsbSpeed.HIGH)
-        except Exception as e:
-            print(f"[Main] Pipeline start failed for device {dev_info.getMxId()}: {e}")
-            continue
-
-        calib = CameraCalibration.from_device(device)
-        cam_mgr.device = device
+    if use_mock:
+        cam_mgr = MockCameraManager()
+        cam_mgr.setup()
         cam_mgr.start_streams()
-        
-        devices.append(device)
         cam_managers.append(cam_mgr)
-        calibrations.append(calib)
+        calibrations.append(None)
+        num_cams = 1
+    else:
+        # ── 2. Create pipelines and initialize cameras ───────────────────────
+        for idx, dev_info in enumerate(devices_info):
+            dev_id = getattr(dev_info, 'getMxId', getattr(dev_info, 'getDeviceId', lambda: getattr(dev_info, 'name', 'Unknown')))()
+            print(f"[Main] Initializing device {idx+1}/{num_cams}: {dev_id}")
+            pipeline = dai.Pipeline()
+            cam_mgr = CameraManager(pipeline=pipeline)
+            
+            cam_mgr.setup()   # RGB + StereoDepth (aligned)
+            # Note: IMU logic removed per vision-only mode requirement
+            
+            try:
+                # Explicitly set HIGH speed for USB 2.0 stability on Jetson
+                device = dai.Device(pipeline, dev_info, dai.UsbSpeed.HIGH)
+            except Exception as e:
+                print(f"[Main] Pipeline start failed for device {dev_info.getMxId()}: {e}")
+                continue
+
+            calib = CameraCalibration.from_device(device)
+            cam_mgr.device = device
+            cam_mgr.start_streams()
+            
+            devices.append(device)
+            cam_managers.append(cam_mgr)
+            calibrations.append(calib)
 
     if not cam_managers:
         print("[Main] Failed to initialize any devices. Exiting.")
@@ -137,7 +150,8 @@ def main():
                      use_reloader=False, log_output=False, allow_unsafe_werkzeug=True)
     finally:
         print("[Main] Shutting down …")
-        imu_mgr.stop()
+        if imu_mgr:
+            imu_mgr.stop()
         for cam_mgr in cam_managers:
             cam_mgr.stop()
         for device in devices:

@@ -27,6 +27,7 @@
       <a href="/rula"><i class="fas fa-person-rays"></i><span>RULA</span></a>
       <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
       <a href="/3d"><i class="fas fa-cube"></i><span>3D View</span></a>
+      <a href="/ai"><i class="fas fa-brain"></i><span>AI Model</span></a>
       <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
       <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
     </div>
@@ -42,7 +43,9 @@
     <!-- Page header -->
     <div class="page-header">
       <h1 class="page-title"><i class="fas fa-wave-square"></i> Real‑Time Ergonomic Assessment</h1>
-      <p class="page-sub"><i class="fas fa-camera" style="margin-right:0.3rem;color:var(--cyan)"></i>OAK‑D Vision · Multi-View Pose Fusion · Edge AI &nbsp;·&nbsp; <span id="headerCamMode" style="color:var(--cyan);font-weight:600">Detecting cameras…</span></p>
+      <p class="page-sub"><i class="fas fa-camera" style="margin-right:0.3rem;color:var(--cyan)"></i>OAK‑D Vision ·
+        Multi-View Pose Fusion · Edge AI &nbsp;·&nbsp; <span id="headerCamMode"
+          style="color:var(--cyan);font-weight:600">Detecting cameras…</span></p>
     </div>
 
     <!-- ── Metric cards ── -->
@@ -52,7 +55,9 @@
         <div class="metric-label"><i class="fas fa-person-rays" style="color:var(--cyan)"></i> RULA Score</div>
         <div class="metric-value" id="rulaVal">--</div>
         <div><span class="risk-chip" id="rulaChip">Waiting</span></div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="rulaBar"></div></div>
+        <div class="metric-bar">
+          <div class="metric-bar-fill" id="rulaBar"></div>
+        </div>
         <div class="metric-sub">Max 7 · Upper limbs + trunk</div>
       </div>
 
@@ -60,28 +65,40 @@
         <div class="metric-label"><i class="fas fa-person" style="color:var(--purple)"></i> REBA Score</div>
         <div class="metric-value" id="rebaVal">--</div>
         <div><span class="risk-chip" id="rebaChip">Waiting</span></div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="rebaBar" style="background:var(--purple);box-shadow:0 0 12px var(--purple)"></div></div>
+        <div class="metric-bar">
+          <div class="metric-bar-fill" id="rebaBar" style="background:var(--purple);box-shadow:0 0 12px var(--purple)">
+          </div>
+        </div>
         <div class="metric-sub">Max 15 · Whole body</div>
       </div>
 
       <div class="card metric-card" style="--accent:var(--green)">
         <div class="metric-label"><i class="fas fa-head-side" style="color:var(--col-neck)"></i> Neck Angle</div>
         <div class="metric-value" id="neckVal">--<small style="font-size:1.2rem">°</small></div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="neckBar" style="background:var(--col-neck);box-shadow:0 0 12px var(--col-neck)"></div></div>
+        <div class="metric-bar">
+          <div class="metric-bar-fill" id="neckBar"
+            style="background:var(--col-neck);box-shadow:0 0 12px var(--col-neck)"></div>
+        </div>
         <div class="metric-sub">Flexion / Extension</div>
       </div>
 
       <div class="card metric-card" style="--accent:var(--yellow)">
         <div class="metric-label"><i class="fas fa-person-walking" style="color:var(--col-trunk)"></i> Trunk Angle</div>
         <div class="metric-value" id="trunkVal">--<small style="font-size:1.2rem">°</small></div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="trunkBar" style="background:var(--col-trunk);box-shadow:0 0 12px var(--col-trunk)"></div></div>
+        <div class="metric-bar">
+          <div class="metric-bar-fill" id="trunkBar"
+            style="background:var(--col-trunk);box-shadow:0 0 12px var(--col-trunk)"></div>
+        </div>
         <div class="metric-sub">Forward lean</div>
       </div>
 
       <div class="card metric-card" style="--accent:var(--orange)">
         <div class="metric-label"><i class="fas fa-hand" style="color:var(--col-arm-l)"></i> Upper Arm</div>
         <div class="metric-value" id="armVal">--<small style="font-size:1.2rem">°</small></div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="armBar" style="background:var(--col-arm-l);box-shadow:0 0 12px var(--col-arm-l)"></div></div>
+        <div class="metric-bar">
+          <div class="metric-bar-fill" id="armBar"
+            style="background:var(--col-arm-l);box-shadow:0 0 12px var(--col-arm-l)"></div>
+        </div>
         <div class="metric-sub">Left shoulder elevation</div>
       </div>
 
@@ -94,24 +111,26 @@
       <div class="col-main">
 
         <!-- Live RGB feed + skeleton canvas overlay -->
-        <div class="card video-panel" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; margin-bottom: 1.25rem;">
+        <div class="card video-panel"
+          style="padding: 0; overflow: hidden; display: flex; flex-direction: column; margin-bottom: 1.25rem;">
           <div class="panel-header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
             <div class="panel-title"><i class="fas fa-video" style="color:var(--cyan)"></i> Live Assessment View</div>
             <div style="display:flex;gap:0.6rem;align-items:center">
-               <span style="font-size: 0.7rem; color: var(--green);">●</span><span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">RGB</span>
-               <span id="skelToggleBtn" title="Toggle skeleton overlay"
-                 style="cursor:pointer;font-size:0.75rem;font-weight:600;padding:2px 8px;border-radius:20px;
-                        background:rgba(0,212,255,0.15);color:var(--cyan);border:1px solid var(--cyan);user-select:none;"
-               >SKEL ON</span>
+              <span style="font-size: 0.7rem; color: var(--green);">●</span><span
+                style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">RGB</span>
+              <span id="skelToggleBtn" title="Toggle skeleton overlay"
+                style="cursor:pointer;font-size:0.75rem;font-weight:600;padding:2px 8px;border-radius:20px;
+                        background:rgba(0,212,255,0.15);color:var(--cyan);border:1px solid var(--cyan);user-select:none;">SKEL ON</span>
             </div>
           </div>
           <!-- Video + canvas stacked via CSS Grid for perfect alignment -->
-          <div id="videoWrapper" style="display:grid; place-items:center; width:100%; background:#000; min-height:320px; position:relative; overflow:hidden;">
+          <div id="videoWrapper"
+            style="display:grid; place-items:center; width:100%; background:#000; min-height:320px; position:relative; overflow:hidden;">
             <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed"
-                 style="grid-area:1/1; width:100%; height:auto; max-height:480px; display:block;">
+              style="grid-area:1/1; width:100%; height:auto; max-height:480px; display:block;">
             <!-- Skeleton canvas — drawn in JS, sits on top of the img -->
             <canvas id="skelCanvas"
-                    style="grid-area:1/1; width:100%; height:100%; pointer-events:none; z-index:2;"></canvas>
+              style="grid-area:1/1; width:100%; height:100%; pointer-events:none; z-index:2;"></canvas>
           </div>
         </div>
 
@@ -145,7 +164,8 @@
         <!-- Score trend hidden canvas -->
         <div class="card chart-panel" id="scoreTrendPanel" style="display:none">
           <div class="panel-header">
-            <div class="panel-title"><i class="fas fa-chart-line" style="color:var(--purple)"></i> RULA / REBA History</div>
+            <div class="panel-title"><i class="fas fa-chart-line" style="color:var(--purple)"></i> RULA / REBA History
+            </div>
           </div>
           <div class="chart-wrap">
             <canvas id="scoreChart" height="90"></canvas>
@@ -154,10 +174,49 @@
 
         <!-- Anomaly feed -->
         <div class="card anomaly-panel">
-          <div class="panel-title"><i class="fas fa-triangle-exclamation" style="color:var(--yellow)"></i> Posture Event Feed</div>
+          <div class="panel-title"><i class="fas fa-triangle-exclamation" style="color:var(--yellow)"></i> Posture Event
+            Feed</div>
           <div class="anomaly-list" id="anomalyFeed">
             <div class="anomaly-item anomaly-ok"><span class="anomaly-icon">✅</span> System initialising — waiting for
               data…</div>
+          </div>
+        </div>
+
+        <!-- AI Engine Analysis (NEW) -->
+        <div class="card ai-analysis-panel" id="aiPanel"
+          style="border: 1px solid var(--cyan); background: rgba(0,212,255,0.02);">
+          <div class="panel-header">
+            <div class="panel-title"><i class="fas fa-brain" style="color:var(--cyan)"></i> AI Engine Analysis</div>
+            <span class="badge-pill" id="aiStatus" style="background:var(--green); color:#000;">ACTIVE</span>
+          </div>
+          <div style="padding: 0 1rem 1rem 1rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.85rem;">
+              <span style="color:var(--text-muted)">Model:</span>
+              <span style="color:var(--cyan); font-weight:600;">ErgoNet-v1 (Numpy)</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+              <div class="ai-stat-box"
+                style="background:rgba(255,255,255,0.03); padding:0.5rem; border-radius:4px; text-align:center;">
+                <div style="font-size:0.7rem; color:var(--text-muted);">AI RULA</div>
+                <div id="aiRula" style="font-size:1.2rem; font-weight:700; color:var(--cyan);">--</div>
+              </div>
+              <div class="ai-stat-box"
+                style="background:rgba(255,255,255,0.03); padding:0.5rem; border-radius:4px; text-align:center;">
+                <div style="font-size:0.7rem; color:var(--text-muted);">AI REBA</div>
+                <div id="aiReba" style="font-size:1.2rem; font-weight:700; color:var(--purple);">--</div>
+              </div>
+            </div>
+            <div id="aiPredictionFeed"
+              style="margin-top:0.75rem; font-size:0.75rem; color:var(--text-muted); max-height:120px; overflow-y:auto;">
+              <i class="fas fa-info-circle"></i> Waiting for landmark inference...
+            </div>
+            <div id="aiConditionBox"
+              style="margin-top:0.75rem; padding:0.5rem; border-radius:4px; background:rgba(0,0,0,0.2); display:none;">
+              <div style="font-size:0.65rem; color:var(--cyan); text-transform:uppercase; letter-spacing:1px;">AI
+                Diagnosis (Experimental)</div>
+              <div id="aiCondition" style="font-size:0.9rem; font-weight:700; color:#fff; margin-top:2px;">--</div>
+              <div id="aiSeverity" style="font-size:0.75rem; color:var(--text-muted);">Severity: --</div>
+            </div>
           </div>
         </div>
 
@@ -168,7 +227,8 @@
 
         <!-- Body diagram -->
         <div class="card body-panel">
-          <div class="panel-title" style="margin-bottom:0.75rem"><i class="fas fa-person" style="color:var(--cyan)"></i> Body Risk Map</div>
+          <div class="panel-title" style="margin-bottom:0.75rem"><i class="fas fa-person" style="color:var(--cyan)"></i>
+            Body Risk Map</div>
 
           <div class="body-diagram-wrap">
             <!-- SVG stick-figure -->
@@ -252,7 +312,8 @@
         </div>
         <!-- Camera mode info panel (replaces IMU panel) -->
         <div class="card cam-mode-panel">
-          <div class="panel-title" style="margin-bottom:0.85rem"><i class="fas fa-camera" style="color:var(--cyan)"></i> Camera System</div>
+          <div class="panel-title" style="margin-bottom:0.85rem"><i class="fas fa-camera" style="color:var(--cyan)"></i>
+            Camera System</div>
           <div class="cam-mode-badge"><i class="fas fa-circle-dot"></i> <span id="camModeBadge">Detecting…</span></div>
           <div class="cam-stat-grid">
             <div class="cam-info-item">
@@ -278,10 +339,15 @@
 
     <!-- Status bar -->
     <div class="status-bar">
-      <div class="status-chip"><span class="dot" id="camDot"></span><i class="fas fa-camera" style="color:var(--text-muted);font-size:0.7rem"></i> Camera: <strong id="camStatus">Connecting…</strong></div>
-      <div class="status-chip"><span class="dot"></span><i class="fas fa-layer-group" style="color:var(--text-muted);font-size:0.7rem"></i> Mode: <strong id="sysMode">--</strong></div>
-      <div class="status-chip" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
-        <i class="fas fa-gauge" style="color:var(--cyan)"></i> FPS <strong id="fpsStat">--</strong> &nbsp;|&nbsp; Frames <strong id="frameStat">0</strong>
+      <div class="status-chip"><span class="dot" id="camDot"></span><i class="fas fa-camera"
+          style="color:var(--text-muted);font-size:0.7rem"></i> Camera: <strong id="camStatus">Connecting…</strong>
+      </div>
+      <div class="status-chip"><span class="dot"></span><i class="fas fa-layer-group"
+          style="color:var(--text-muted);font-size:0.7rem"></i> Mode: <strong id="sysMode">--</strong></div>
+      <div class="status-chip"
+        style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
+        <i class="fas fa-gauge" style="color:var(--cyan)"></i> FPS <strong id="fpsStat">--</strong> &nbsp;|&nbsp; Frames
+        <strong id="frameStat">0</strong>
       </div>
     </div>
 

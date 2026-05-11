@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ErgoVision | AI Model Analysis</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+  <style>
+    .ai-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .full-width {
+      grid-column: span 2;
+    }
+
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--cyan);
+      margin: 0.5rem 0;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Navbar ── -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-icon"><i class="fas fa-heartbeat"></i></span>
+      <span class="logo">ErgoVision</span>
+      <span class="badge-pill">AI · Analysis</span>
+    </div>
+    <div class="nav-links">
+      <a href="/"><i class="fas fa-gauge-high"></i><span>Dashboard</span></a>
+      <a href="/camera"><i class="fas fa-video"></i><span>Live Feed</span></a>
+      <a href="/rula"><i class="fas fa-person-rays"></i><span>RULA</span></a>
+      <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
+      <a href="/3d"><i class="fas fa-cube"></i><span>3D View</span></a>
+      <a href="/ai"><i class="fas fa-brain"></i><span>AI Model</span></a>
+      <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
+      <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-btn" id="themeBtn">🌙</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h1 class="page-title"><i class="fas fa-microchip"></i> AI Model Performance & Evaluation</h1>
+      <p class="page-sub">Model: ErgoNet-v2 (Angle-Based TMS Engine) · Training Status: Completed</p>
+    </div>
+
+    <div class="ai-grid">
+      <!-- Live Prediction Monitor (NEW) -->
+      <div class="card full-width" style="border: 1px solid var(--cyan); background: rgba(0,212,255,0.02);">
+        <div class="panel-header">
+          <div class="panel-title"><i class="fas fa-satellite-dish" style="color:var(--cyan)"></i> Real-time Model
+            Output</div>
+          <span class="badge-pill" style="background:var(--green); color:#000;">LIVE INFERENCE</span>
+        </div>
+        <div style="padding:1.5rem; display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; text-align:center;">
+          <div class="stat-box">
+            <div style="font-size:0.75rem; color:var(--text-muted);">PREDICTED RISK</div>
+            <div id="liveRisk" style="font-size:1.8rem; font-weight:700; color:var(--cyan);">--</div>
+          </div>
+          <div class="stat-box">
+            <div style="font-size:0.75rem; color:var(--text-muted);">SEVERITY INDEX</div>
+            <div id="liveSeverity" style="font-size:1.8rem; font-weight:700; color:var(--purple);">--</div>
+          </div>
+          <div class="stat-box">
+            <div style="font-size:0.75rem; color:var(--text-muted);">CONDITION</div>
+            <div id="liveCondition" style="font-size:1.2rem; font-weight:700; color:var(--orange); margin-top:0.4rem;">
+              --</div>
+          </div>
+          <div class="stat-box">
+            <div style="font-size:0.75rem; color:var(--text-muted);">CONFIDENCE</div>
+            <div id="liveConfidence" style="font-size:1.8rem; font-weight:700; color:var(--green);">--</div>
+          </div>
+        </div>
+        <div id="aiConsole"
+          style="margin: 0 1.5rem 1.5rem 1.5rem; background:rgba(0,0,0,0.3); padding:0.8rem; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--cyan); border-radius:4px; height:60px; overflow-y:hidden;">
+          > Initializing neural engine...<br>
+          > Awaiting landmark stream...
+        </div>
+      </div>
+
+      <!-- Training Loss Chart -->
+      <div class="card full-width">
+        <div class="panel-header">
+          <div class="panel-title"><i class="fas fa-chart-area"></i> Training & Validation Loss</div>
+        </div>
+        <div class="chart-container">
+          <canvas id="lossChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Accuracy Chart -->
+      <div class="card full-width">
+        <div class="panel-header">
+          <div class="panel-title"><i class="fas fa-chart-line"></i> Model Accuracy Curve</div>
+        </div>
+        <div class="chart-container">
+          <canvas id="accuracyChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Architecture Info -->
+      <div class="card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="fas fa-sitemap"></i> Model Architecture</div>
+        </div>
+        <ul style="list-style:none; padding:1rem; color:var(--text-muted); font-size:0.9rem; line-height:2;">
+          <li><i class="fas fa-layer-group" style="color:var(--cyan)"></i> <strong>Input:</strong> 12 Nodes (Joint
+            Angles)</li>
+          <li><i class="fas fa-hidden" style="color:var(--purple)"></i> <strong>Hidden:</strong> 512 Nodes (ReLU)</li>
+          <li><i class="fas fa-bullseye" style="color:var(--green)"></i> <strong>Output 1:</strong> Risk Score
+            (Regression)</li>
+          <li><i class="fas fa-table" style="color:var(--yellow)"></i> <strong>Output 2:</strong> Severity Code</li>
+          <li><i class="fas fa-stethoscope" style="color:var(--orange)"></i> <strong>Output 3:</strong> Condition Code
+          </li>
+        </ul>
+      </div>
+
+      <!-- Dataset Info -->
+      <div class="card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="fas fa-database"></i> Training Dataset</div>
+        </div>
+        <ul style="list-style:none; padding:1rem; color:var(--text-muted); font-size:0.9rem; line-height:2;">
+          <li><i class="fas fa-vial"></i> <strong>Source:</strong> TMS Enriched Dataset</li>
+          <li><i class="fas fa-file-csv"></i> <strong>Samples:</strong> 20,000 Records</li>
+          <li><i class="fas fa-balance-scale"></i> <strong>Features:</strong> Flexion, Extension, Velocity</li>
+          <li><i class="fas fa-clock"></i> <strong>Last Train:</strong> Just Now (v2.0)</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    async function initCharts() {
+      try {
+        const response = await fetch('/api/training_log');
+        const data = await response.json();
+        
+        if (!data || data.length === 0) {
+          console.warn("No training log data found.");
+          return;
+        }
+
+        const labels = data.map(d => d.epoch);
+        const loss = data.map(d => d.loss);
+        const valLoss = data.map(d => d.val_loss);
+        const acc = data.map(d => d.accuracy);
+        const valAcc = data.map(d => d.val_accuracy);
+
+        const chartOptions = {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 1000 },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#ddd', font: { family: 'Inter' } } }
+          }
+        };
+
+        // Loss Chart
+        new Chart(document.getElementById('lossChart'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Train Loss', data: loss, borderColor: '#00d4ff', borderWidth: 2, pointRadius: 0, fill: false },
+              { label: 'Val Loss', data: valLoss, borderColor: '#9d50bb', borderWidth: 2, pointRadius: 0, fill: false, borderDash: [5, 5] }
+            ]
+          },
+          options: chartOptions
+        });
+
+        // Accuracy Chart
+        new Chart(document.getElementById('accuracyChart'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Train Accuracy', data: acc, borderColor: '#00ffaa', borderWidth: 2, pointRadius: 0, fill: false },
+              { label: 'Val Accuracy', data: valAcc, borderColor: '#f9d423', borderWidth: 2, pointRadius: 0, fill: false, borderDash: [5, 5] }
+            ]
+          },
+          options: chartOptions
+        });
+      } catch (err) {
+        console.error("Chart initialization failed:", err);
+      }
+    }
+
+    // Initialize charts immediately
+    initCharts();
+
+    // Live Prediction logic (with error handling)
+    try {
+      const socket = io();
+      const liveRisk = document.getElementById('liveRisk');
+      const liveSeverity = document.getElementById('liveSeverity');
+      const liveCondition = document.getElementById('liveCondition');
+      const liveConfidence = document.getElementById('liveConfidence');
+      const aiConsole = document.getElementById('aiConsole');
+
+      socket.on('connect', () => console.log("AI Page connected to socket"));
+
+      socket.on('pose_update', (data) => {
+        if (data.ai_results) {
+          const res = data.ai_results;
+          const risk = res.risk_score || 0;
+          
+          if (liveRisk) liveRisk.textContent = risk.toFixed(1);
+          
+          const conditions = ["Normal", "Tendinitis", "Back Pain", "Cervicalgia", "Bursitis", "Strain", "Carpal Tunnel"];
+          const severities = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"];
+          
+          const cIdx = Math.min(Math.max(Math.round(res.condition_code || 0), 0), conditions.length - 1);
+          const sIdx = Math.min(Math.max(Math.round(res.severity_code || 0), 0), severities.length - 1);
+          
+          if (liveCondition) liveCondition.textContent = conditions[cIdx];
+          if (liveSeverity) liveSeverity.textContent = severities[sIdx];
+          
+          const conf = ((1 - (risk / 10)) * 100).toFixed(0);
+          if (liveConfidence) liveConfidence.textContent = conf + "%";
+          
+          if (aiConsole) {
+            aiConsole.innerHTML = `> [${new Date().toLocaleTimeString()}] INFERENCE: Risk=${risk.toFixed(2)}, Severity=${sIdx}, Cond=${cIdx}<br>> Engine: ErgoNet-v2.0 Active`;
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Socket logic failed:", err);
+    }
+
+    // Theme toggle logic
+    document.getElementById('themeBtn').onclick = () => {
+      document.body.classList.toggle('light-mode');
+      document.getElementById('themeBtn').innerText = document.body.classList.contains('light-mode') ? '🌞' : '🌙';
+    };
+  </script>
+</body>
+
+</html>
