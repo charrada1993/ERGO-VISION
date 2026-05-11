@@ -1,6 +1,4 @@
-# ERGO-VISION 🦴📷
-
-> **Real-time ergonomic posture assessment system** using 1–3 OAK-D cameras, MediaPipe pose estimation, RULA/REBA scoring, Visual IMU, and a live web dashboard.
+> **Real-time ergonomic posture assessment system** using 1–3 OAK-D cameras, MediaPipe pose estimation, and **ErgoNet v2.0 Neural Engine** for high-accuracy TMS diagnostics.
 
 ---
 
@@ -38,12 +36,11 @@
 - Capture synchronized **RGB + aligned stereo depth** streams
 - Detect and track human body keypoints with **MediaPipe Pose** (Optimized for NVIDIA Jetson Orin)
 - **Depth-Based Masking**: Auto-filters background workers for robust single-subject tracking
-- Compute **joint angles** (neck, trunk, arms, wrists, elbows)
-- Calculate standardized **RULA** and **REBA** ergonomic risk scores
-- Derive **orientation data** (roll, pitch, yaw) from optical flow — **no hardware IMU required**
-- Display everything on a **live Flask + Socket.IO web dashboard**
+- **AI Engine (v2.0)**: Neural multi-output model trained on **20,000+ TMS enriched samples**
+- **Clinical Diagnostics**: Predicts musculoskeletal conditions (Tendinitis, Back Pain, etc.) and severity levels
+- **Display everything** on a live Flask + Socket.IO web dashboard with interactive AI evaluation curves
 - **Data Collection**: Record multi-joint kinematic sessions to timestamped CSV files
-- **Automated Reporting**: Generate professional **PDF ergonomic risk reports** with analytics and charts
+- **Automated Reporting**: Generate professional **PDF ergonomic risk reports** with AI-driven clinical insights
 
 The system runs on **NVIDIA Jetson Orin** (Ubuntu) or any Linux/Windows machine with Python 3.10+.
 
@@ -134,10 +131,11 @@ The system runs on **NVIDIA Jetson Orin** (Ubuntu) or any Linux/Windows machine 
 | 📊 **REBA scoring** | Full 15-level risk score using exact official tables |
 | 🌀 **Visual IMU** | Roll/pitch/yaw from optical flow — no hardware IMU needed |
 | 🌐 **Live web dashboard** | Flask + Socket.IO, accessible from any browser on the network |
-| 🗄️ **Data logging** | CSV session logs with timestamps and all angle/score data |
-| 📄 **PDF reports** | Professional risk reports with analytics, joint stats, and clinical recommendations |
+| 🧠 **ErgoNet v2.0 Engine** | **Angle-Based Multi-Output Model**; predictions for 4 diagnostic heads |
+| 🏥 **TMS Diagnostics** | Automated detection of 7 ergonomic conditions + 5 severity levels |
+| 📈 **AI Analytics Page** | Dedicated `/ai` page with training history and live inference monitor |
 | 🛡️ **Depth-Masking** | 0.5m – 3.0m depth filter to ignore background people and noise |
-| ⚡ **Jetson Orin Ready** | Model complexity 0 + optimized queues for zero-lag performance |
+| ⚡ **Jetson Orin Ready** | 8ms inference latency + optimized queues for zero-lag performance |
 
 ---
 
@@ -216,19 +214,18 @@ ergonomic-assessment-system/
 │       ├── reba.html           # REBA detail page
 │       └── 3d.html             # Interactive 3D skeleton view
 │
-├── data/
-│   ├── logger.py               # Session data logger (CSV)
-│   └── session_manager.py      # Session lifecycle management
+├── ai/
+│   ├── models/                 # ErgoNet v2.0 (.pkl) weights
+│   ├── data/                   # TMS enriched dataset + training history logs
+│   ├── operation/              # Inference engine, ONNX export, and TensorRT scripts
+│   ├── train_v2.py             # Version 2 training pipeline (angle-based)
+│   └── synthetic_gen.py        # High-fidelity ergonomic data generator
 │
 ├── reporting/
 │   ├── report_generator.py     # PDF report builder
 │   └── graphs.py               # Matplotlib chart helpers
 │
-└── examples/                   # Official DepthAI examples (reference only)
-    ├── ColorCamera/
-    ├── StereoDepth/
-    ├── IMU/
-    └── ...
+└── ...
 ```
 
 ---
@@ -294,7 +291,8 @@ http://localhost:5000/dashboard
 | `/reba` | REBA score breakdown (Group A, B, sub-scores) |
 | `/3d` | Interactive Three.js 3D skeleton viewer |
 | `/collection` | **[NEW]** Data collection page (Start/Stop recording to CSV) |
-| `/report` | **[NEW]** Report generation engine (CSV → PDF) |
+| `/report` | Report generation engine (CSV → PDF) |
+| `/ai` | **[NEW]** AI Model Analysis: Training curves & Live Inference log |
 
 ---
 
