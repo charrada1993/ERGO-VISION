@@ -762,3 +762,40 @@ body.light-mode .cam-mode-badge {
   .nav-links a i { font-size: 1rem; }
   .page-title { font-size: 1.2rem; }
 }
+
+/* ─── AI Panel components ────────────────────────────────── */
+.stat-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 0.75rem;
+  text-align: center;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.stat-box:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.ai-console {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--cyan);
+  line-height: 1.7;
+  overflow-y: auto;
+}
+
+/* Light mode overrides for AI panel */
+body.light-mode .stat-box {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.1);
+}
+body.light-mode .ai-console {
+  background: rgba(0,0,0,0.06);
+  color: #0d7377;
+  border-color: rgba(0,0,0,0.1);
+}

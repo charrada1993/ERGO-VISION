@@ -239,41 +239,31 @@ socket.on('pose_update', (data) => {
   if (data.ai_results) {
     if (aiPanel) aiPanel.style.display = 'block';
     
-    // AI scores
-    const air = data.ai_results.risk_score || data.ai_results.RULA_score || 0;
-    const are = data.ai_results.risk_score * 1.5 || data.ai_results.REBA_score || 0;
-    
-    // PRIMARY OVERRIDE: Show AI results as the main metric
-    rulaScore = Math.round(air);
-    rebaScore = Math.round(are);
-    
-    if (aiRulaEl) aiRulaEl.textContent = rulaScore;
-    if (aiRebaEl) aiRebaEl.textContent = rebaScore;
+    const air = data.ai_results.risk_score || 0;
+    // Use actual RULA/REBA from the backend — AI results enrich the diagnosis panel only
+    if (aiRulaEl) aiRulaEl.textContent = typeof data.rula === 'number' ? data.rula : rulaScore;
+    if (aiRebaEl) aiRebaEl.textContent = typeof data.reba === 'number' ? data.reba : rebaScore;
     
     // AI v2: Condition and Severity
     const condBox = document.getElementById('aiConditionBox');
-    const condEl = document.getElementById('aiCondition');
-    const sevEl = document.getElementById('aiSeverity');
+    const condEl  = document.getElementById('aiCondition');
+    const sevEl   = document.getElementById('aiSeverity');
     
     if (data.ai_results.condition_code !== undefined) {
       if (condBox) condBox.style.display = 'block';
-      
-      // Simple heuristic mappings (based on TMS dataset patterns)
       const conditions = ["Normal", "Tendinitis", "Back Pain", "Cervicalgia", "Bursitis", "Strain", "Carpal Tunnel"];
       const severities = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"];
-      
-      const cIdx = Math.min(Math.max(Math.round(data.ai_results.condition_code), 0), conditions.length - 1);
-      const sIdx = Math.min(Math.max(Math.round(data.ai_results.severity_code), 0), severities.length - 1);
-      
+      const cIdx = Math.min(Math.max(Math.round(data.ai_results.condition_code || 0), 0), conditions.length - 1);
+      const sIdx = Math.min(Math.max(Math.round(data.ai_results.severity_code  || 0), 0), severities.length - 1);
       if (condEl) condEl.textContent = conditions[cIdx];
-      if (sevEl) sevEl.textContent = `Severity: ${severities[sIdx]}`;
+      if (sevEl)  sevEl.textContent  = `Severity: ${severities[sIdx]}`;
     }
 
-    // Show AI prediction highlights
     if (aiFeedEl) {
+      const conf = Math.max(0, Math.min(100, (1 - (air / 10)) * 100)).toFixed(0);
       aiFeedEl.innerHTML = `
-        <div style="margin-bottom:2px; color:var(--cyan)">AI Mode: Neural TMS Engine v2.0</div>
-        <div style="margin-bottom:2px">Risk Confidence: ${((1 - (data.ai_results.risk_score/10)) * 100).toFixed(0)}%</div>
+        <div style="margin-bottom:2px; color:var(--cyan)">AI Mode: ErgoNet v2.0 Active</div>
+        <div style="margin-bottom:2px">Risk Confidence: ${conf}% &nbsp;|&nbsp; Risk Score: ${air.toFixed(2)}</div>
       `;
     }
     isAI = true;
@@ -291,12 +281,10 @@ socket.on('pose_update', (data) => {
     rulaLabel.innerHTML += ' <span style="font-size:0.6rem; background:var(--cyan); color:#000; padding:1px 4px; border-radius:3px;">AI</span>';
   }
 
-  // Add AI badge to metric cards if AI is active
-  const aiBadges = document.querySelectorAll('.ai-badge');
-  if (isAI && aiBadges.length === 0) {
-     const badgeHtml = '<span class="ai-badge" style="font-size:0.6rem; background:var(--cyan); color:#000; padding:1px 4px; border-radius:3px; margin-left:5px; vertical-align:middle; font-weight:800;">AI</span>';
-     document.getElementById('rulaVal').insertAdjacentHTML('afterend', badgeHtml);
-     document.getElementById('rebaVal').insertAdjacentHTML('afterend', badgeHtml);
+  // AI badge: inject once only
+  if (isAI && !document.querySelector('.ai-badge')) {
+    const badgeHtml = '<span class="ai-badge" style="font-size:0.6rem; background:var(--cyan); color:#000; padding:1px 4px; border-radius:3px; margin-left:5px; vertical-align:middle; font-weight:800;">AI</span>';
+    document.getElementById('rulaVal').insertAdjacentHTML('afterend', badgeHtml);
   }
 
   // Progress bars

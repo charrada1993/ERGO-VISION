@@ -67,7 +67,7 @@
       <a href="/rula"><i class="fas fa-person-rays"></i><span>RULA</span></a>
       <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
       <a href="/3d"><i class="fas fa-cube"></i><span>3D View</span></a>
-      <a href="/ai"><i class="fas fa-brain"></i><span>AI Model</span></a>
+      <a href="/ai" class="active"><i class="fas fa-brain"></i><span>AI Model</span></a>
       <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
       <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
     </div>
@@ -79,7 +79,7 @@
   <main class="container">
     <div class="page-header">
       <h1 class="page-title"><i class="fas fa-microchip"></i> AI Model Performance & Evaluation</h1>
-      <p class="page-sub">Model: ErgoNet-v2 (Angle-Based TMS Engine) · Training Status: Completed</p>
+      <p class="page-sub">Model: ErgoNet v2.0 &nbsp;&middot;&nbsp; Architecture: 12&rarr;512&rarr;4 MLP &nbsp;&middot;&nbsp; Dataset: TMS Enriched (20,000 samples) &nbsp;&middot;&nbsp; Training: 500 epochs &nbsp;&middot;&nbsp; <span style="color:var(--green);font-weight:600">97.14% Train Acc</span></p>
     </div>
 
     <div class="ai-grid">
@@ -92,27 +92,30 @@
         </div>
         <div style="padding:1.5rem; display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; text-align:center;">
           <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted);">PREDICTED RISK</div>
-            <div id="liveRisk" style="font-size:1.8rem; font-weight:700; color:var(--cyan);">--</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Train Accuracy</div>
+            <div id="liveRisk" style="font-size:2rem; font-weight:700; color:var(--cyan);">97.14%</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Final epoch 500</div>
           </div>
           <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted);">SEVERITY INDEX</div>
-            <div id="liveSeverity" style="font-size:1.8rem; font-weight:700; color:var(--purple);">--</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Val Accuracy</div>
+            <div id="liveSeverity" style="font-size:2rem; font-weight:700; color:var(--purple);">94.22%</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Generalisation</div>
           </div>
           <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted);">CONDITION</div>
-            <div id="liveCondition" style="font-size:1.2rem; font-weight:700; color:var(--orange); margin-top:0.4rem;">
-              --</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Final MSE Loss</div>
+            <div id="liveCondition" style="font-size:2rem; font-weight:700; color:var(--orange);">0.2742</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Training loss</div>
           </div>
           <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted);">CONFIDENCE</div>
-            <div id="liveConfidence" style="font-size:1.8rem; font-weight:700; color:var(--green);">--</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Live Risk Score</div>
+            <div id="liveConfidence" style="font-size:2rem; font-weight:700; color:var(--green);">--</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Real-time inference</div>
           </div>
         </div>
         <div id="aiConsole"
-          style="margin: 0 1.5rem 1.5rem 1.5rem; background:rgba(0,0,0,0.3); padding:0.8rem; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--cyan); border-radius:4px; height:60px; overflow-y:hidden;">
-          > Initializing neural engine...<br>
-          > Awaiting landmark stream...
+          style="margin: 0 1.5rem 1.5rem 1.5rem; background:rgba(0,0,0,0.3); padding:0.8rem; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--cyan); border-radius:4px; height:72px; overflow-y:auto; line-height:1.6;">
+          &gt; ErgoNet v2.0 loaded &mdash; 12&rarr;512&rarr;4 topology<br>
+          &gt; Awaiting live pose stream...
         </div>
       </div>
 
@@ -142,14 +145,13 @@
           <div class="panel-title"><i class="fas fa-sitemap"></i> Model Architecture</div>
         </div>
         <ul style="list-style:none; padding:1rem; color:var(--text-muted); font-size:0.9rem; line-height:2;">
-          <li><i class="fas fa-layer-group" style="color:var(--cyan)"></i> <strong>Input:</strong> 12 Nodes (Joint
-            Angles)</li>
-          <li><i class="fas fa-hidden" style="color:var(--purple)"></i> <strong>Hidden:</strong> 512 Nodes (ReLU)</li>
-          <li><i class="fas fa-bullseye" style="color:var(--green)"></i> <strong>Output 1:</strong> Risk Score
-            (Regression)</li>
-          <li><i class="fas fa-table" style="color:var(--yellow)"></i> <strong>Output 2:</strong> Severity Code</li>
-          <li><i class="fas fa-stethoscope" style="color:var(--orange)"></i> <strong>Output 3:</strong> Condition Code
-          </li>
+          <li><i class="fas fa-layer-group" style="color:var(--cyan)"></i> <strong>Input:</strong> 12 Nodes (Joint Angles)</li>
+          <li><i class="fas fa-microchip" style="color:var(--purple)"></i> <strong>Hidden:</strong> 512 Nodes (ReLU, Xavier Init)</li>
+          <li><i class="fas fa-bullseye" style="color:var(--green)"></i> <strong>Output 1:</strong> Risk Score (0&ndash;10, Regression)</li>
+          <li><i class="fas fa-table" style="color:var(--yellow)"></i> <strong>Output 2:</strong> Severity Code (0&ndash;4)</li>
+          <li><i class="fas fa-stethoscope" style="color:var(--orange)"></i> <strong>Output 3:</strong> Condition Code (0&ndash;6)</li>
+          <li><i class="fas fa-map-pin" style="color:var(--red)"></i> <strong>Output 4:</strong> Location Code (0&ndash;20)</li>
+          <li><i class="fas fa-weight-hanging" style="color:var(--text-muted)"></i> <strong>Params:</strong> 12&times;512 + 512&times;4 = 8,192 weights</li>
         </ul>
       </div>
 
@@ -159,10 +161,12 @@
           <div class="panel-title"><i class="fas fa-database"></i> Training Dataset</div>
         </div>
         <ul style="list-style:none; padding:1rem; color:var(--text-muted); font-size:0.9rem; line-height:2;">
-          <li><i class="fas fa-vial"></i> <strong>Source:</strong> TMS Enriched Dataset</li>
-          <li><i class="fas fa-file-csv"></i> <strong>Samples:</strong> 20,000 Records</li>
-          <li><i class="fas fa-balance-scale"></i> <strong>Features:</strong> Flexion, Extension, Velocity</li>
-          <li><i class="fas fa-clock"></i> <strong>Last Train:</strong> Just Now (v2.0)</li>
+          <li><i class="fas fa-vial" style="color:var(--cyan)"></i> <strong>Source:</strong> TMS Enriched Dataset (Synthetic)</li>
+          <li><i class="fas fa-file-csv" style="color:var(--green)"></i> <strong>Samples:</strong> 20,000 Records</li>
+          <li><i class="fas fa-balance-scale" style="color:var(--yellow)"></i> <strong>Features:</strong> 12 angle columns (Flexion, Extension, Deviation)</li>
+          <li><i class="fas fa-bullseye" style="color:var(--purple)"></i> <strong>Targets:</strong> Risk, Severity, Condition, Location</li>
+          <li><i class="fas fa-clock" style="color:var(--orange)"></i> <strong>Epochs:</strong> 500 &nbsp;&middot;&nbsp; <strong>Optimizer:</strong> Mini-batch SGD</li>
+          <li><i class="fas fa-stopwatch" style="color:var(--text-muted)"></i> <strong>Inference:</strong> ~8 ms (Jetson Orin Nano)</li>
         </ul>
       </div>
     </div>
@@ -245,24 +249,22 @@
       socket.on('pose_update', (data) => {
         if (data.ai_results) {
           const res = data.ai_results;
-          const risk = res.risk_score || 0;
-          
-          if (liveRisk) liveRisk.textContent = risk.toFixed(1);
-          
+          const risk = typeof res.risk_score === 'number' ? res.risk_score : 0;
           const conditions = ["Normal", "Tendinitis", "Back Pain", "Cervicalgia", "Bursitis", "Strain", "Carpal Tunnel"];
           const severities = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"];
-          
           const cIdx = Math.min(Math.max(Math.round(res.condition_code || 0), 0), conditions.length - 1);
-          const sIdx = Math.min(Math.max(Math.round(res.severity_code || 0), 0), severities.length - 1);
-          
-          if (liveCondition) liveCondition.textContent = conditions[cIdx];
-          if (liveSeverity) liveSeverity.textContent = severities[sIdx];
-          
-          const conf = ((1 - (risk / 10)) * 100).toFixed(0);
-          if (liveConfidence) liveConfidence.textContent = conf + "%";
-          
+          const sIdx = Math.min(Math.max(Math.round(res.severity_code  || 0), 0), severities.length - 1);
+
+          if (liveRisk)       liveRisk.textContent      = risk.toFixed(2);
+          if (liveCondition)  liveCondition.textContent  = conditions[cIdx];
+          if (liveSeverity)   liveSeverity.textContent   = severities[sIdx];
+
+          // Confidence: severity 0=healthy means 100%, severity 4=critical means ~20%
+          const conf = Math.max(0, Math.min(100, ((4 - sIdx) / 4) * 100)).toFixed(0);
+          if (liveConfidence) liveConfidence.textContent = conf + '%';
+
           if (aiConsole) {
-            aiConsole.innerHTML = `> [${new Date().toLocaleTimeString()}] INFERENCE: Risk=${risk.toFixed(2)}, Severity=${sIdx}, Cond=${cIdx}<br>> Engine: ErgoNet-v2.0 Active`;
+            aiConsole.innerHTML = `&gt; [${new Date().toLocaleTimeString()}] INFERENCE: Risk=${risk.toFixed(2)}, Sev=${severities[sIdx]}, Cond=${conditions[cIdx]}<br>&gt; Engine: ErgoNet v2.0 &mdash; 12&rarr;512&rarr;4 Active`;
           }
         }
       });

@@ -18,21 +18,19 @@ class RULACalculator:
         Additionnels: rotation ext/int → +1 ; bras soutenu ou charge modérée → +1
         """
         a = abs(angle)
-        if a < 20:
-            s = 2
         if a == 0:
             s = 1
-        if 20 <= a <= 45:
+        elif a < 20:
             s = 2
-        elif 45 < a <= 90:
+        elif a <= 45:
+            s = 2
+        elif a <= 90:
             s = 3
-        elif a > 90:
-            s = 4
         else:
-            s = 2 if a > 0 else 1
+            s = 4
 
         if rotated:   s += 1
-        if supported: s += 1   # "Bras soutenu ou charge modérée → +1" per RULA text
+        if supported: s += 1
         return min(max(s, 1), 6)
 
     @staticmethod

@@ -53,14 +53,27 @@ export MKL_NUM_THREADS=2
 # Disable Python hash randomization for reproducible runs.
 export PYTHONHASHSEED=0
 
-# ── 6. Launch application ─────────────────────────────────────────────────
+# ── 6. Log rotation (prevent backend.log from growing unbounded) ─────────────
+LOG_FILE="backend.log"
+MAX_LOG_MB=50
+if [ -f "$LOG_FILE" ]; then
+    LOG_SIZE_MB=$(du -m "$LOG_FILE" | cut -f1)
+    if [ "$LOG_SIZE_MB" -ge "$MAX_LOG_MB" ]; then
+        echo "[Jetson] Log rotation: ${LOG_FILE} is ${LOG_SIZE_MB} MB — archiving"
+        mv "$LOG_FILE" "${LOG_FILE%.log}_$(date +%Y%m%d_%H%M%S).log.bak"
+        # Keep only 2 backups
+        ls -t backend_*.log.bak 2>/dev/null | tail -n +3 | xargs rm -f 2>/dev/null || true
+    fi
+fi
+
+# ── 7. Launch application ─────────────────────────────────────────────────
 echo "[Jetson] Starting ERGO-VISION … (http://0.0.0.0:5000)"
 echo "[Jetson] Resources: $(free -h | awk '/^Mem:/{print $3"/"$2" RAM used"}')"
 
 # taskset: bind Python to CPUs 0-3 (big Cortex-A78 cores on Orin Nano).
 # This keeps the OS and USB driver on CPUs 4-5 and avoids cache thrashing.
 if command -v taskset &>/dev/null; then
-    exec taskset -c 0-3 python3 app.py
+    exec taskset -c 0-3 python3 app.py 2>&1 | tee -a "$LOG_FILE"
 else
-    exec python3 app.py
+    exec python3 app.py 2>&1 | tee -a "$LOG_FILE"
 fi

@@ -9,14 +9,20 @@ class NumpyInference:
     Supports Version 1 (Landmarks) and Version 2 (Angles).
     """
     def __init__(self, model_path=None):
+        # Resolve paths relative to this file's location (not CWD)
+        _base = os.path.dirname(os.path.abspath(__file__))
+        _models_dir = os.path.join(_base, '..', 'models')
+        
         # Default search order: v2 then v1
         if model_path is None:
-            if os.path.exists("ai/models/ergo_net_v2.pkl"):
-                model_path = "ai/models/ergo_net_v2.pkl"
-            elif os.path.exists("ai/models/ergo_net_numpy.pkl"):
-                model_path = "ai/models/ergo_net_numpy.pkl"
+            _v2 = os.path.join(_models_dir, 'ergo_net_v2.pkl')
+            _v1 = os.path.join(_models_dir, 'ergo_net_numpy.pkl')
+            if os.path.exists(_v2):
+                model_path = _v2
+            elif os.path.exists(_v1):
+                model_path = _v1
             else:
-                raise FileNotFoundError("No ErgoNet model found in ai/models/")
+                raise FileNotFoundError(f"No ErgoNet model found in {_models_dir}")
             
         with open(model_path, 'rb') as f:
             self.state = pickle.load(f)
@@ -53,14 +59,14 @@ class NumpyInference:
                     'Trunk_Flexion_deg':      input_data.get('trunk', 0),
                     'L_Shoulder_Flexion_deg': input_data.get('upper_arm_left', 0),
                     'R_Shoulder_Flexion_deg': input_data.get('upper_arm_right', 0),
-                    'L_Elbow_Flexion_deg':    input_data.get('elbow_left', 0),
-                    'R_Elbow_Flexion_deg':    input_data.get('elbow_right', 0),
+                    'L_Elbow_Flexion_deg':    input_data.get('elbow_left', 90),
+                    'R_Elbow_Flexion_deg':    input_data.get('elbow_right', 90),
                     'L_Wrist_Deviation_deg':  input_data.get('wrist_left', 0),
-                    'R_Wrist_Deviation_deg':  input_data.get('wrist_right', 0),
-                    'L_Hip_Flexion_deg':      0, # Placeholder
-                    'R_Hip_Flexion_deg':      0, # Placeholder
-                    'L_Knee_Flexion_deg':     0, # Placeholder
-                    'R_Knee_Flexion_deg':     0  # Placeholder
+                    'R_Wrist_Deviation_deg':  input_data.get('wrist_right', input_data.get('wrist_left', 0)),
+                    'L_Hip_Flexion_deg':      input_data.get('hip_left', 0),
+                    'R_Hip_Flexion_deg':      input_data.get('hip_right', 0),
+                    'L_Knee_Flexion_deg':     input_data.get('knee_left', 0),
+                    'R_Knee_Flexion_deg':     input_data.get('knee_right', 0),
                 }
                 x = np.array([mapping.get(col, 0) for col in self.input_cols]).reshape(1, -1)
             else:
@@ -80,10 +86,20 @@ class NumpyInference:
         # 4. Denormalize output
         y_orig = z2 * self.y_std + self.y_mean
         
-        # 5. Map to dictionary
+        # 5. Map to dictionary with output clamping
         results = {}
         for i, col in enumerate(self.target_cols):
-            results[col] = float(y_orig[0, i])
+            val = float(y_orig[0, i])
+            # Clamp outputs to valid domain ranges
+            if col == 'risk_score':
+                val = float(np.clip(val, 0.0, 10.0))
+            elif col == 'severity_code':
+                val = float(np.clip(round(val), 0, 4))
+            elif col == 'location_code':
+                val = float(np.clip(round(val), 0, 20))
+            elif col == 'condition_code':
+                val = float(np.clip(round(val), 0, 20))
+            results[col] = val
             
         return results
 

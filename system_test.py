@@ -221,12 +221,40 @@ required_templates = [
     "dashboard.html", "camera.html",
     "rula.html", "reba.html",
     "3d.html", "collection.html", "report.html",
+    "ai.html",
 ]
 tmpl_dir = os.path.join(base, "web", "templates")
 for t in required_templates:
     path = os.path.join(tmpl_dir, t)
     check(f"template/{t}", "pass" if os.path.exists(path) else "warn",
           "" if os.path.exists(path) else "MISSING")
+print()
+
+# ── 10. AI Model ─────────────────────────────────────────────────────────────
+print(f"  {CYN}▶  10. AI Model{RST}")
+models_dir = os.path.join(base, "ai", "models")
+v2_path = os.path.join(models_dir, "ergo_net_v2.pkl")
+v1_path = os.path.join(models_dir, "ergo_net_numpy.pkl")
+if os.path.exists(v2_path):
+    size_mb = os.path.getsize(v2_path) / (1024 * 1024)
+    check("ErgoNet v2.0 model", "pass", f"ergo_net_v2.pkl ({size_mb:.1f} MB)")
+elif os.path.exists(v1_path):
+    size_mb = os.path.getsize(v1_path) / (1024 * 1024)
+    check("ErgoNet v1.0 model", "warn", f"ergo_net_numpy.pkl ({size_mb:.1f} MB) — run train_v2.py")
+else:
+    check("ErgoNet model", "fail",
+          "No model found in ai/models/ — run: cd ai && python3 train_v2.py")
+
+try:
+    from ai.operation.inference import NumpyInference
+    inf = NumpyInference()
+    dummy = {col: 10.0 for col in inf.input_cols}
+    result = inf.predict(dummy)
+    risk = result.get('risk_score', 'N/A')
+    check("Inference smoke test", "pass",
+          f"v{inf.version}: risk_score={risk:.2f}, outputs={list(result.keys())}")
+except Exception as e:
+    check("Inference smoke test", "fail", str(e)[:80])
 print()
 
 # ── Summary ───────────────────────────────────────────────────────────────────

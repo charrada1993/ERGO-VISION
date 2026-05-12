@@ -1,4 +1,5 @@
 # camera/mock_manager.py
+import math
 import numpy as np
 import cv2
 import time
@@ -74,4 +75,3 @@ class MockCameraManager:
     def stop(self):
         self.running = False
 
-import math

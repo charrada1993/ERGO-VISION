@@ -57,9 +57,12 @@ class NumpyErgoNet:
 
 def main():
     # 1. Load Data
-    data_path = "ai/data/dataset.csv"
+    # Logic to handle paths correctly whether run from root or ai/ directory
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(base_dir, "data", "dataset.csv")
+    
     if not os.path.exists(data_path):
-        print("[AI] ERROR: Dataset not found. Run download_dataset.py first.")
+        print(f"[AI] ERROR: Dataset {data_path} not found. Run download_dataset.py first.")
         return
 
     df = pd.read_csv(data_path)
@@ -83,7 +86,8 @@ def main():
     model.train(X_norm, y_norm, epochs=300, lr=0.001)
 
     # 3. Save Model + Normalization Stats
-    os.makedirs("ai/models", exist_ok=True)
+    models_dir = os.path.join(base_dir, "models")
+    os.makedirs(models_dir, exist_ok=True)
     state = {
         'W1': model.W1, 'b1': model.b1,
         'W2': model.W2, 'b2': model.b2,
@@ -91,9 +95,10 @@ def main():
         'y_mean': y_mean, 'y_std': y_std,
         'target_cols': target_cols
     }
-    with open("ai/models/ergo_net_numpy.pkl", 'wb') as f:
+    save_path = os.path.join(models_dir, "ergo_net_numpy.pkl")
+    with open(save_path, 'wb') as f:
         pickle.dump(state, f)
-    print("[AI] Training Complete. Model saved to ai/models/ergo_net_numpy.pkl")
+    print(f"[AI] Training Complete. Model saved to {save_path}")
 
 if __name__ == "__main__":
     main()

@@ -1,42 +1,82 @@
 # ERGO-VISION: Advanced AI Documentation
 
-This document explains the custom AI architecture and dataset logic used for automated RULA/REBA assessment on the **NVIDIA Jetson Orin (reComputer J3011)**.
+*Last updated: 2026-05-11 — ErgoNet v2.0 training complete.*
 
-## 1. AI Architecture: "Ergo-ML-Core"
+This document explains the custom AI architecture, dataset logic, and training pipeline used for automated TMS (Musculoskeletal Disorder) risk assessment on the **NVIDIA Jetson Orin (reComputer J3011)**.
 
-Since the environment was optimized for performance and lacked heavy dependencies (like PyTorch or TensorFlow), I implemented a **Neural Network from scratch in raw Numpy**.
+---
+
+## 1. AI Architecture: ErgoNet v2.0
+
+Since the deployment environment requires minimal dependencies and maximum speed, the AI is implemented as a **Neural Network from scratch in raw NumPy**.
 
 ### Network Topology
-- **Input Layer**: 99 Nodes (33 MediaPipe Landmarks x 3 coordinates [x, y, z]).
-- **Hidden Layer**: 256 Nodes (ReLU Activation).
-- **Output Layer**: 104 Nodes (Multi-Head Regression).
-- **Optimization**: Multi-threaded BLAS (using Jetson's ARM v8.2 cores).
 
-### Predictive Heads
-The model uses a **Multi-Output** strategy to predict:
-1.  **Motion Parameters**: 24 outputs for flexion, lateral, and rotation angles.
-2.  **Ergonomic Scores**: 80 outputs representing the sub-scores from every RULA and REBA table.
-3.  **Anomalies**: Probability scores for risk in specific body segments.
+| Layer | Shape | Activation |
+|---|---|---|
+| Input | 12 joint angles | Z-score normalized |
+| Hidden | 512 nodes | ReLU |
+| Output | 4 diagnostic heads | Linear (regression) |
+
+### Predictive Heads (Multi-Task Output)
+
+| Head | Output | Description |
+|---|---|---|
+| `risk_score` | Float 0.0–10.0 | Overall ergonomic risk magnitude |
+| `severity_code` | Int 0–4 | Severity level: Healthy → Critical |
+| `location_code` | Int | Anatomical region of highest risk |
+| `condition_code` | Int | TMS condition (Tendinitis, Strain, etc.) |
+
+### Key Improvements in v2.0
+
+- **Angle-Based Inputs** (replaces raw landmarks): joint angles are scale-invariant and camera-distance-invariant, greatly improving real-world stability.
+- **512-node hidden layer** (vs. 256 in v1): higher capacity for multi-joint interaction patterns.
+- **TMS Enriched Dataset**: 20,000+ samples vs. 15,000 in v1, with condition-specific data augmentation.
 
 ---
 
-## 2. Dataset Type: "Synthetic-Ergo-3D"
+## 2. Training Results (v2.0 — 2026-05-11)
 
-Because professional ergonomic datasets are often private or restricted, the model was trained using a **High-Fidelity Synthetic Dataset** generated locally.
-
-### Data Generation Logic
-- **Kinematic Constraints**: The dataset simulates human movement within anatomical limits (e.g., Neck flexion: -10° to 60°).
-- **Coordinate Space**: 3D landmark configurations are generated to match the MediaPipe coordinate system (X: Right, Y: Down, Z: Forward).
-- **Labeling**: "Ground Truth" RULA/REBA scores are calculated for every frame using the official biometric tables.
-- **Volume**: 15,000 unique samples, including "Anomalous" (extreme) and "Safe" (neutral) postures.
+| Metric | Value |
+|---|---|
+| Dataset | `dataset_TMS_enriched.csv` (~20,000 samples) |
+| Epochs | 500 |
+| Learning Rate | 0.005 |
+| **Final Training Loss (MSE)** | **0.2742** |
+| **Final Training Accuracy** | **97.14%** |
+| **Final Validation Accuracy** | **94.22%** |
+| Model file | `ai/models/ergo_net_v2.pkl` |
 
 ---
 
-## Detailed Documentation Modules
+## 3. Dataset: Synthetic-Ergo-3D (TMS Enriched)
 
-For a deeper explanation of each component, please refer to the following files in the `docs/` folder:
+Because professional ergonomic datasets with precise clinical labels are rare, the model is trained on a **High-Fidelity Synthetic Dataset** generated via `ai/synthetic_gen.py`.
 
-1.  **[AI Architecture](docs/architecture.md)**: Deep dive into the Numpy Multi-Head Neural Network.
-2.  **[Dataset & Methodology](docs/dataset.md)**: Explaining the Synthetic-Ergo-3D data generation.
-3.  **[10-Day Forecasting](docs/forecasting.md)**: The math behind the LSTM time-series prediction.
-4.  **[Jetson Hardware Tuning](docs/jetson_optimization.md)**: Power and performance optimizations for the Orin platform.
+### Generation Logic
+
+- **Kinematic Constraints**: Simulates human movement within anatomical limits (e.g., Neck: −10° to +60°).
+- **Coordinate Space**: 3D landmark configurations match the MediaPipe coordinate system.
+- **Auto-Labeling**: Ground-truth RULA/REBA scores computed for every frame using official tables.
+- **TMS Enrichment**: Over-represents high-risk postures and condition-specific patterns for clinical sensitivity.
+
+---
+
+## 4. Detailed Documentation
+
+For deeper technical explanations, see the `docs/` folder:
+
+| File | Contents |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | Network topology, forward pass math, initialization |
+| [docs/dataset.md](docs/dataset.md) | TMS enriched dataset structure and generation methodology |
+| [docs/model_report.md](docs/model_report.md) | Full training results, metrics, and saved model schema |
+| [docs/forecasting.md](docs/forecasting.md) | 10-day LSTM risk forecasting logic |
+| [docs/jetson_optimization.md](docs/jetson_optimization.md) | Hardware tuning, power mode, memory optimization |
+| [docs/onnx_guide.md](docs/onnx_guide.md) | Future ONNX → TensorRT export pathway |
+| [ai/evaluation/README.md](ai/evaluation/README.md) | Epoch-by-epoch training progression and inference benchmarks |
+| [ai/operation/README.md](ai/operation/README.md) | Operational inference engine details |
+
+---
+
+*Documented by ErgoVision AI Team · 2026*

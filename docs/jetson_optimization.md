@@ -1,17 +1,90 @@
-# Jetson Orin Optimization: Hardware Tuning
+# Jetson Orin Optimization: Hardware Tuning Guide
 
-The ERGO-VISION system is specifically tuned for the **NVIDIA Jetson Orin Nano (reComputer J3011)**. To achieve real-time 8 FPS performance with AI tracking, several hardware-level optimizations were applied.
+*Last updated: 2026-05-11*
 
-## 1. Power & Clock Management
-The `run.sh` script applies the following to maximize the 8GB RAM and ARM cores:
-- **NVPModel 15W**: Puts the Jetson into its high-performance power mode.
-- **Jetson Clocks**: Pinned the CPU and GPU to their maximum frequencies (`sudo jetson_clocks`) to eliminate "Dynamic Frequency Scaling" lag.
+The ERGO-VISION system is tuned for the **NVIDIA Jetson Orin Nano (reComputer J3011, 8 GB)**. To achieve real-time performance (pose estimation + AI inference + video streaming simultaneously), several hardware and software optimizations are applied.
 
-## 2. Memory (RAM) Efficiency
-With 8GB of RAM, we must be careful with memory fragmentation.
-- **MALLOC_ARENA_MAX=2**: This environment variable prevents the GLIBC allocator from creating too many arenas, which can lead to memory exhaustion on ARM devices.
-- **ZRAM Configuration**: The system uses a 4GB Swap-on-RAM (ZRAM) to handle sudden spikes in MediaPipe memory usage.
+---
 
-## 3. Computation Speed
-- **Numpy BLAS**: Our custom AI uses OpenBLAS, which is highly optimized for the ARM v8.2 NEON instructions on the Orin. This allows the 100-output model to run in less than **0.5 milliseconds**.
-- **Process Binding**: The main processing loop is bound to the first 4 CPU cores using `taskset -c 0-3`, ensuring it doesn't compete with background OS tasks.
+## 1. System Environment
+
+| Component | Details |
+|---|---|
+| **Device** | NVIDIA Jetson Orin Nano (reComputer J3011) |
+| **RAM** | 8 GB LPDDR5 |
+| **OS** | Ubuntu 22.04 (JetPack 6.x) |
+| **Python** | 3.10 (`oak_env` virtual environment) |
+| **Camera** | OAK-D (USB 3.1 Gen 2) |
+
+---
+
+## 2. Power & Clock Management
+
+```bash
+sudo nvpmodel -m 0   # 15W max performance mode
+sudo jetson_clocks   # Pin CPU/GPU to max frequency
+```
+
+| Setting | Effect |
+|---|---|
+| **NVPModel 0** | All CPU cores active, max frequency |
+| **Jetson Clocks** | Eliminates Dynamic Frequency Scaling throttle spikes |
+
+---
+
+## 3. Memory Efficiency
+
+```bash
+export MALLOC_ARENA_MAX=2
+```
+
+| Optimization | Details |
+|---|---|
+| `MALLOC_ARENA_MAX=2` | Prevents GLIBC memory arena fragmentation on ARM |
+| ZRAM 4 GB swap | Handles MediaPipe RAM spikes gracefully |
+| NumPy-only AI | ErgoNet v2.0 uses ~15 MB RAM vs. ~2 GB for PyTorch |
+
+---
+
+## 4. AI Inference Speed
+
+ErgoNet v2.0 achieves **< 8 ms** inference latency via:
+
+- **OpenBLAS** — ARM v8.2 NEON vectorized matrix multiply
+- **Single hidden layer (512)** — minimal matrix sizes
+- **Pre-loaded normalization stats** — zero per-frame overhead at inference
+- **No backpropagation** — operational model does forward pass only
+
+Full inference pipeline per frame:
+```
+Angles → Z-score normalize → Forward pass → De-normalize → Socket.IO emit  (~8–12 ms total)
+```
+
+---
+
+## 5. Camera Pipeline Settings
+
+| Setting | Value | Reason |
+|---|---|---|
+| `setBlocking(False)` + `setQueueSize(1)` | Non-blocking, size 1 | Prevents pipeline stall; discards stale frames |
+| `tryGetAll()[-1]` | Host side | Always processes the freshest frame |
+| RGB resolution | 1280×720 @ 30 FPS | Balances accuracy and USB bandwidth |
+
+---
+
+## 6. Running the System
+
+```bash
+source ~/oak_env/bin/activate
+cd ~/ERGO-VISION
+python3 app.py
+```
+
+For CPU core isolation (optional):
+```bash
+taskset -c 0-3 python3 app.py
+```
+
+---
+
+*Documented by ErgoVision AI Team · 2026*
