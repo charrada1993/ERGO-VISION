@@ -86,10 +86,11 @@ class SocketEvents:
         def handle_stop_recording():
             print("[Socket] Stop recording requested")
             self.is_recording = False
+            import os
+            filename = os.path.basename(self.logger.session_path) if getattr(self.logger, 'session_path', None) else ""
             self.logger.end_session()
-            emit('recording_status', {'is_recording': False, 'samples': self.logger.sample_count})
+            emit('recording_status', {'is_recording': False, 'samples': self.logger.sample_count, 'filename': filename})
 
-    # ──────────────────────────────────────────────────────────────────
     def process_loop(self):
         """
         Background thread for the single-camera Jetson Orin pipeline:
@@ -296,13 +297,13 @@ class SocketEvents:
                         else:
                             vision_anoms = []
                         self.logger.log(angles, rula_res, reba_res,
-                                        vision_anoms + anomalies)
+                                        vision_anoms + anomalies, ai_results=ai_results)
                     except Exception:
                         pass   # logging errors are non-critical
                     if not self.is_recording:
                         last_log = now
 
-                # No extra sleep here — MediaPipe inference time
+                # ── No extra sleep here — MediaPipe inference time
                 # (~50–120 ms on ARM Lite model) is the natural frame limiter.
 
             except Exception as e:

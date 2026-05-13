@@ -20,7 +20,7 @@ class DataLogger:
         self.session_path = os.path.join(Config.SESSION_DIR, filename)
         self.file = open(self.session_path, 'w', newline='')
         self.writer = csv.writer(self.file)
-        # Detailed columns including both sides
+        # Detailed columns including both sides + AI Metrics
         self.writer.writerow([
             "timestamp", "frame_id", 
             "neck_deg", "trunk_deg", 
@@ -28,17 +28,22 @@ class DataLogger:
             "el_left_deg", "el_right_deg", 
             "wr_left_deg", "wr_right_deg",
             "RULA_score", "REBA_score",
-            "risk_prediction", "anomalies"
+            "risk_prediction", "anomalies",
+            "ai_risk_score", "ai_severity", "ai_location", "ai_condition"
         ])
         self.start_time = time.time()
         self.sample_count = 0
         return filename
 
-    def log(self, angles, rula_result, reba_result, anomalies):
+    def log(self, angles, rula_result, reba_result, anomalies, ai_results=None):
         if self.writer is None or self.file is None:
             return
         elapsed = time.time() - self.start_time
         self.sample_count += 1
+        
+        # Extract AI results if available
+        ai_res = ai_results if ai_results else {}
+        
         row = [
             round(elapsed, 3),
             self.sample_count,
@@ -53,7 +58,11 @@ class DataLogger:
             rula_result.get('RULA_score', 0),
             reba_result.get('REBA_score', 0),
             rula_result.get('risk_level', 'Low'),
-            "; ".join(anomalies) if anomalies else "None"
+            "; ".join(anomalies) if anomalies else "None",
+            round(ai_res.get('risk_score', 0.0), 2),
+            ai_res.get('severity_code', 0),
+            ai_res.get('location_code', 0),
+            ai_res.get('condition_code', 0)
         ]
         self.writer.writerow(row)
         self.file.flush()

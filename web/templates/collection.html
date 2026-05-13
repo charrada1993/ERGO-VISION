@@ -15,6 +15,7 @@
       justify-content: center;
       margin-top: 1rem;
     }
+
     .btn-record {
       padding: 0.8rem 1.5rem;
       border: none;
@@ -27,27 +28,33 @@
       gap: 0.5rem;
       transition: all 0.2s;
     }
+
     .btn-start {
       background-color: var(--cyan);
       color: var(--bg-dark);
     }
+
     .btn-start:hover {
       background-color: #00d2ff;
       transform: translateY(-2px);
     }
+
     .btn-stop {
       background-color: #ff4757;
       color: white;
     }
+
     .btn-stop:hover {
       background-color: #ff6b81;
       transform: translateY(-2px);
     }
+
     .btn-disabled {
       opacity: 0.5;
       cursor: not-allowed;
       pointer-events: none;
     }
+
     .status-panel {
       background: var(--bg-card);
       border: 1px solid var(--border);
@@ -56,6 +63,7 @@
       text-align: center;
       margin-bottom: 1.5rem;
     }
+
     .recording-indicator {
       display: inline-block;
       width: 12px;
@@ -66,11 +74,21 @@
       animation: blink 1s infinite;
       display: none;
     }
+
     @keyframes blink {
-      0% { opacity: 1; }
-      50% { opacity: 0.2; }
-      100% { opacity: 1; }
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.2;
+      }
+
+      100% {
+        opacity: 1;
+      }
     }
+
     .samples-count {
       font-size: 2rem;
       font-weight: bold;
@@ -98,6 +116,10 @@
       <a href="/collection" class="active"><i class="fas fa-database"></i><span>Record Data</span></a>
       <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
     </div>
+    <div class="nav-right">
+      <div class="live-dot" id="liveStatus">LIVE</div>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+    </div>
   </nav>
 
   <!-- ── Main ── -->
@@ -113,24 +135,28 @@
           <div class="panel-header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
             <div class="panel-title"><i class="fas fa-video" style="color:var(--cyan)"></i> Live Camera</div>
           </div>
-          <div style="position: relative; width: 100%; background: #000; display: flex; justify-content: center; align-items: center; min-height: 480px;">
-            <img id="videoFeed" src="/video_feed" alt="Live RGB Feed" style="width: 100%; height: auto; max-height: 600px; object-fit: contain;">
+          <div
+            style="position: relative; width: 100%; background: #000; display: flex; justify-content: center; align-items: center; min-height: 480px;">
+            <img id="videoFeed" src="/video_feed" alt="Live RGB Feed"
+              style="width: 100%; height: auto; max-height: 600px; object-fit: contain;">
           </div>
         </div>
       </div>
 
       <div class="col-side">
         <div class="status-panel">
-          <h2><span class="recording-indicator" id="recIndicator"></span><span id="statusText">Ready to Record</span></h2>
+          <h2><span class="recording-indicator" id="recIndicator"></span><span id="statusText">Ready to Record</span>
+          </h2>
           <div class="samples-count" id="sampleCount">0</div>
           <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">Samples Collected</div>
-          
+
           <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);" id="currentFile">
             No active session
           </div>
 
           <div class="record-controls">
-            <button class="btn-record btn-start" id="btnStart"><i class="fas fa-circle" style="color: #ff4757;"></i> Start</button>
+            <button class="btn-record btn-start" id="btnStart"><i class="fas fa-circle" style="color: #ff4757;"></i>
+              Start</button>
             <button class="btn-record btn-stop btn-disabled" id="btnStop"><i class="fas fa-square"></i> Stop</button>
           </div>
         </div>
@@ -140,6 +166,22 @@
 
   <script>
     const socket = io();
+
+    // Theme toggle logic
+    const themeBtn = document.getElementById('themeBtn');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', () => {
+        document.body.classList.toggle('light-mode');
+        const isLight = document.body.classList.contains('light-mode');
+        themeBtn.textContent = isLight ? '☀️' : '🌙';
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+      });
+      if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.add('light-mode');
+        themeBtn.textContent = '☀️';
+      }
+    }
+
     const btnStart = document.getElementById('btnStart');
     const btnStop = document.getElementById('btnStop');
     const recIndicator = document.getElementById('recIndicator');
@@ -174,7 +216,8 @@
         statusText.style.color = 'var(--text)';
         if (data.samples !== undefined) {
           sampleCount.innerText = data.samples;
-          currentFile.innerHTML = `Saved <strong>${data.samples}</strong> samples.`;
+          const downloadUrl = `/api/download_csv/${data.filename}`;
+          currentFile.innerHTML = `Saved <strong>${data.samples}</strong> samples. <br><a href="${downloadUrl}" class="download-link" style="color:var(--cyan); text-decoration: underline; margin-top: 5px; display: inline-block;"><i class="fas fa-download"></i> Download CSV</a>`;
         }
       }
     });
@@ -186,4 +229,5 @@
     });
   </script>
 </body>
+
 </html>

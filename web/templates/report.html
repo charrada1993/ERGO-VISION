@@ -16,15 +16,18 @@
       max-width: 600px;
       margin: 0 auto;
     }
+
     .form-group {
       margin-bottom: 1.5rem;
     }
+
     .form-group label {
       display: block;
       margin-bottom: 0.5rem;
       font-weight: bold;
       color: var(--text);
     }
+
     .session-select {
       width: 100%;
       padding: 0.8rem;
@@ -34,6 +37,7 @@
       color: var(--text);
       font-size: 1rem;
     }
+
     .btn-generate {
       width: 100%;
       padding: 1rem;
@@ -46,21 +50,29 @@
       cursor: pointer;
       transition: all 0.2s;
     }
+
     .btn-generate:hover {
       background-color: #00d2ff;
       transform: translateY(-2px);
     }
+
     .btn-generate:disabled {
       background-color: var(--border);
       cursor: not-allowed;
       transform: none;
     }
+
     .spinner {
       display: none;
       margin-left: 10px;
       animation: spin 1s linear infinite;
     }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
   </style>
 </head>
 
@@ -82,6 +94,10 @@
       <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
       <a href="/report" class="active"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
     </div>
+    <div class="nav-right">
+      <div class="live-dot" id="liveStatus">LIVE</div>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+    </div>
   </nav>
 
   <!-- ── Main ── -->
@@ -100,19 +116,55 @@
       </div>
 
       <button class="btn-generate" id="btnGenerate" disabled>
-        <i class="fas fa-file-export"></i> Generate PDF Report <i class="fas fa-spinner spinner" id="spinner"></i>
+        <i class="fas fa-file-pdf"></i> Generate PDF Report <i class="fas fa-spinner spinner" id="spinner"></i>
+      </button>
+
+      <button class="btn-generate" id="btnDownloadCSV" disabled
+        style="background-color: var(--green); margin-top: 10px;">
+        <i class="fas fa-file-csv"></i> Download Raw CSV Data
       </button>
 
       <div id="statusMsg" style="margin-top: 15px; text-align: center; color: var(--text-muted);"></div>
     </div>
-  </main>
 
+    <div class="report-panel" style="margin-top: 20px;">
+      <div class="form-group">
+        <label for="reportSelect">Download Generated Report</label>
+        <select id="reportSelect" class="session-select">
+          <option value="">Loading reports...</option>
+        </select>
+      </div>
+
+      <button class="btn-generate" id="btnDownloadReport" disabled style="background-color: var(--purple);">
+        <i class="fas fa-download"></i> Download Report PDF
+      </button>
+    </div>
+  </main>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // Theme toggle logic
+      const themeBtn = document.getElementById('themeBtn');
+      if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+          document.body.classList.toggle('light-mode');
+          const isLight = document.body.classList.contains('light-mode');
+          themeBtn.textContent = isLight ? '☀️' : '🌙';
+          localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        });
+        if (localStorage.getItem('theme') === 'light') {
+          document.body.classList.add('light-mode');
+          themeBtn.textContent = '☀️';
+        }
+      }
+
       const select = document.getElementById('sessionSelect');
       const btn = document.getElementById('btnGenerate');
+      const btnCSV = document.getElementById('btnDownloadCSV');
       const spinner = document.getElementById('spinner');
       const msg = document.getElementById('statusMsg');
+
+      const reportSelect = document.getElementById('reportSelect');
+      const btnDownloadReport = document.getElementById('btnDownloadReport');
 
       // Fetch sessions
       fetch('/api/sessions')
@@ -129,6 +181,7 @@
               select.appendChild(opt);
             });
             btn.disabled = false;
+            btnCSV.disabled = false;
           } else {
             const opt = document.createElement('option');
             opt.value = '';
@@ -156,12 +209,56 @@
         // Reset UI after short delay assuming download started
         setTimeout(() => {
           btn.disabled = false;
+          btnCSV.disabled = false;
           spinner.style.display = 'none';
-          msg.innerText = 'Download started!';
+          msg.innerText = 'PDF Report download started!';
           msg.style.color = 'var(--green)';
         }, 3000);
+      });
+
+      // Handle CSV Download
+      btnCSV.addEventListener('click', () => {
+        const filename = select.value;
+        if (!filename) return;
+        msg.innerText = 'Downloading raw CSV data...';
+        msg.style.color = 'var(--green)';
+        window.location.href = `/api/download_csv/${filename}`;
+      });
+
+      // Fetch existing reports
+      fetch('/api/reports')
+        .then(res => res.json())
+        .then(data => {
+          reportSelect.innerHTML = '';
+          if (data.reports && data.reports.length > 0) {
+            data.reports.sort().reverse();
+            data.reports.forEach(report => {
+              const opt = document.createElement('option');
+              opt.value = report;
+              opt.textContent = report;
+              reportSelect.appendChild(opt);
+            });
+            btnDownloadReport.disabled = false;
+          } else {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No generated reports found.';
+            reportSelect.appendChild(opt);
+          }
+        })
+        .catch(err => {
+          reportSelect.innerHTML = '<option value="">Error loading reports</option>';
+          console.error(err);
+        });
+
+      // Handle Report Download
+      btnDownloadReport.addEventListener('click', () => {
+        const filename = reportSelect.value;
+        if (!filename) return;
+        window.location.href = `/api/download_report/${filename}`;
       });
     });
   </script>
 </body>
+
 </html>

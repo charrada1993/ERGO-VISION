@@ -75,6 +75,32 @@ def create_app():
         files = [f for f in os.listdir(Config.SESSION_DIR) if f.endswith('.csv')]
         return jsonify({'sessions': files})
 
+    @app.route('/api/reports')
+    def api_reports():
+        os.makedirs(Config.REPORT_DIR, exist_ok=True)
+        files = [f for f in os.listdir(Config.REPORT_DIR) if f.endswith('.pdf')]
+        return jsonify({'reports': files})
+
+
+    @app.route('/api/download_csv/<filename>')
+    def api_download_csv(filename):
+        csv_path = os.path.join(Config.SESSION_DIR, filename)
+        if not os.path.exists(csv_path):
+            return "File not found", 404
+        return send_file(csv_path, as_attachment=True,
+                         download_name=os.path.basename(csv_path),
+                         mimetype='text/csv')
+
+    @app.route('/api/download_report/<filename>')
+    def api_download_report(filename):
+        pdf_path = os.path.join(Config.REPORT_DIR, filename)
+        if not os.path.exists(pdf_path):
+            return "File not found", 404
+        return send_file(pdf_path, as_attachment=True,
+                         download_name=os.path.basename(pdf_path),
+                         mimetype='application/pdf')
+
+
     @app.route('/api/generate_report/<filename>')
     def api_generate_report(filename):
         csv_path = os.path.join(Config.SESSION_DIR, filename)

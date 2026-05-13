@@ -13,6 +13,9 @@
   --surface2:      rgba(15, 17, 26, 0.6);
   --border:        rgba(255,255,255,0.07);
   --border-bright: rgba(255,255,255,0.14);
+  --bg-card:       var(--surface);
+  --bg-dark:       var(--bg2);
+  --border-bright: rgba(255,255,255,0.14);
 
   --text:          #e8edf5;
   --text-muted:    #6b7a99;
@@ -612,6 +615,8 @@ body.light-mode .body-svg line { stroke: rgba(0,0,0,0.15); }
 body.light-mode {
     background: linear-gradient(135deg, #f5f7fa 0%, #e9edf2 100%);
     color: #2c3e50;
+    --bg-card: rgba(255, 255, 255, 0.6);
+    --bg-dark: #f5f7fa;
 }
 body.light-mode::before {
     display: none;

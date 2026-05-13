@@ -51,3 +51,4 @@ ai/data/
 ai/models/
 ai/__pycache__/
 docs/__pycache__/
+scratch/
