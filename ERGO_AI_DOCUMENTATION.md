@@ -57,7 +57,7 @@ Because professional ergonomic datasets with precise clinical labels are rare, t
 
 - **Kinematic Constraints**: Simulates human movement within anatomical limits (e.g., Neck: −10° to +60°).
 - **Coordinate Space**: 3D landmark configurations match the MediaPipe coordinate system.
-- **Auto-Labeling**: Ground-truth RULA/REBA scores computed for every frame using official tables.
+- **Auto-Labeling**: Ground-truth RULA/REBA scores computed for every frame using purely angle-based official clinical tables (excluding subjective load/effort variables).
 - **TMS Enrichment**: Over-represents high-risk postures and condition-specific patterns for clinical sensitivity.
 
 ---

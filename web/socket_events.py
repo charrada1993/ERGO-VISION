@@ -119,6 +119,22 @@ class SocketEvents:
         _last_rgb    = None                               # skip re-processing same frame
         _interval    = 0.125                              # fallback sleep (8 fps period)
 
+        # ── Score hysteresis: only change displayed score after N stable frames ──
+        # Prevents RULA/REBA flipping at boundary values (e.g. neck exactly 20°).
+        _SCORE_HOLD  = 3            # frames a new score must persist before accepted
+        _rula_stable = 0            # frames current candidate has held
+        _reba_stable = 0
+        _rula_cand   = None         # candidate score (not yet committed)
+        _reba_cand   = None
+        _rula_committed = None      # last committed (displayed) score
+        _reba_committed = None
+        _rula_details_committed = {}
+        _reba_details_committed = {}
+        _risk_committed = 'Low'
+        # Last good payload angles/anomalies (dropout holdout at emit layer)
+        _last_angles   = {}
+        _last_anomalies = []
+
         while self.running:
             try:
                 now = time.time()
@@ -161,11 +177,34 @@ class SocketEvents:
                     masked_small_rgb = small_rgb
 
                 # ── 3. Pose estimation ─────────────────────────────────
+                # Run on the FULL rgb frame so MediaPipe visibility scores are accurate;
+                # the internal estimator already downsizes to 320x180.
+                results_raw = self.pose_est._run_raw(rgb) if hasattr(self.pose_est, '_run_raw') else None
                 lm = self.pose_est.get_landmarks(masked_small_rgb)
                 if lm is None:
-                    if now - last_status_msg >= _STATUS_DT:
-                        print("[Processing] No person detected in frame")
-                        last_status_msg = now
+                    # ── Dropout path: hold last good scores for up to _MAX_DROPOUT ──
+                    hold = self.skeleton.enrich_with_depth({})   # returns holdout or {}
+                    if hold and _rula_committed is not None:
+                        # Re-emit with last committed scores so UI doesn't flash '--'
+                        now2 = time.time()
+                        if now2 - last_emit >= _min_emit_dt:
+                            self.socketio.emit('pose_update', _sanitize({
+                                'angles':       _last_angles,
+                                'rula':         _rula_committed,
+                                'reba':         _reba_committed,
+                                'risk_level':   _risk_committed,
+                                'anomalies':    _last_anomalies,
+                                'rula_details': _rula_details_committed,
+                                'reba_details': _reba_details_committed,
+                                'imu':          self._imu_cache,
+                                'ai_results':   None,
+                                '_holdout':     True,
+                            }))
+                            last_emit = now2
+                    else:
+                        if now - last_status_msg >= _STATUS_DT:
+                            print("[Processing] No person detected in frame")
+                            last_status_msg = now
                     time.sleep(0.020)
                     continue
 
@@ -176,49 +215,74 @@ class SocketEvents:
                 if skeleton_3d is None:
                     continue
 
-                # ── 5. RULA + REBA ────────────────────────────────────
-                angles = self.skeleton.compute_angles(skeleton_3d)
+                # ── 5. RULA + REBA — pass depth + calib so 3D pipeline is active ──
+                calib = self.app.config.get('CALIBRATION')
+                frame_h, frame_w = rgb.shape[:2]
+                angles = self.skeleton.compute_angles(
+                    skeleton_3d,
+                    calib=calib,
+                    depth_frame=depth_frame,   # uint16 mm, aligned to RGB
+                    world_landmarks=None,       # fallback handled inside compute_angles
+                    frame_w=frame_w,
+                    frame_h=frame_h,
+                )
 
-                # Depth-enriched angles (EMA smoothing + coordinate correction)
-                if depth_frame is not None and hasattr(self.skeleton, 'enrich_with_depth'):
-                    calib = self.app.config.get('CALIBRATION')
-                    angles = self.skeleton.enrich_with_depth(angles, depth_frame, calib=calib)
+                # EMA smoothing pass
+                angles = self.skeleton.enrich_with_depth(angles)
 
                 rula_res = self.rula_calc.compute(angles)
                 reba_res = self.reba_calc.compute(angles)
 
-                rula_details = {
-                    'upper_arm':   rula_res.get('upper_arm_score'),
-                    'lower_arm':   rula_res.get('lower_arm_score'),
-                    'wrist':       rula_res.get('wrist_score'),
-                    'wrist_twist': rula_res.get('wrist_twist', 1),
-                    'neck':        rula_res.get('neck_score'),
-                    'trunk':       rula_res.get('trunk_score'),
-                    'legs':        rula_res.get('legs_score', 1),
-                    'muscle':      rula_res.get('muscle_score', 0),
-                    'activity':    rula_res.get('activity_score', 0),
-                    'score_a':     rula_res.get('score_A'),
-                    'score_b':     rula_res.get('score_B'),
-                    'score_c':     rula_res.get('score_C'),
-                }
+                # ── Score hysteresis ───────────────────────────────────
+                # A score only becomes the "committed" (displayed) value after
+                # staying the same for _SCORE_HOLD consecutive frames.
+                new_rula = rula_res.get('RULA_score', 0)
+                new_reba = reba_res.get('REBA_score', 0)
 
-                reba_details = {
-                    'trunk':        reba_res.get('trunk_score'),
-                    'trunk_mod':    reba_res.get('trunk_mod', 0),
-                    'neck':         reba_res.get('neck_score'),
-                    'neck_mod':     reba_res.get('neck_mod', 0),
-                    'legs':         reba_res.get('legs_score'),
-                    'knee_mod':     reba_res.get('knee_mod', 0),
-                    'upper_arm':    reba_res.get('upper_arm_score'),
-                    'shoulder_mod': reba_res.get('shoulder_mod', 0),
-                    'lower_arm':    reba_res.get('lower_arm_score'),
-                    'wrist':        reba_res.get('wrist_score'),
-                    'wrist_twist':  reba_res.get('wrist_twist', 0),
-                    'coupling':     reba_res.get('coupling', 0),
-                    'table_a':      reba_res.get('table_A'),
-                    'table_b':      reba_res.get('table_B'),
-                    'score_c':      reba_res.get('score_C'),
-                }
+                if new_rula == _rula_cand:
+                    _rula_stable += 1
+                else:
+                    _rula_cand, _rula_stable = new_rula, 1
+
+                if new_reba == _reba_cand:
+                    _reba_stable += 1
+                else:
+                    _reba_cand, _reba_stable = new_reba, 1
+
+                if _rula_stable >= _SCORE_HOLD or _rula_committed is None:
+                    _rula_committed          = _rula_cand
+                    _rula_details_committed  = {
+                        'upper_arm':   rula_res.get('upper_arm_score'),
+                        'lower_arm':   rula_res.get('lower_arm_score'),
+                        'wrist':       rula_res.get('wrist_score'),
+                        'wrist_twist': rula_res.get('wrist_twist', 1),
+                        'neck':        rula_res.get('neck_score'),
+                        'trunk':       rula_res.get('trunk_score'),
+                        'legs':        rula_res.get('legs_score', 1),
+                        'score_a':     rula_res.get('score_A'),
+                        'score_b':     rula_res.get('score_B'),
+                        'score_c':     rula_res.get('score_C'),
+                    }
+                    _risk_committed = rula_res.get('risk_level', 'Low')
+
+                if _reba_stable >= _SCORE_HOLD or _reba_committed is None:
+                    _reba_committed          = _reba_cand
+                    _reba_details_committed  = {
+                        'trunk':        reba_res.get('trunk_score'),
+                        'trunk_mod':    reba_res.get('trunk_mod', 0),
+                        'neck':         reba_res.get('neck_score'),
+                        'neck_mod':     reba_res.get('neck_mod', 0),
+                        'legs':         reba_res.get('legs_score'),
+                        'knee_mod':     reba_res.get('knee_mod', 0),
+                        'upper_arm':    reba_res.get('upper_arm_score'),
+                        'shoulder_mod': reba_res.get('shoulder_mod', 0),
+                        'lower_arm':    reba_res.get('lower_arm_score'),
+                        'wrist':        reba_res.get('wrist_score'),
+                        'wrist_twist':  reba_res.get('wrist_twist', 0),
+                        'table_a':      reba_res.get('table_A'),
+                        'table_b':      reba_res.get('table_B'),
+                        'score_c':      reba_res.get('score_C'),
+                    }
 
                 # ── 5b. AI Inference (Version 2) ──────────────────────
                 ai_results = None
@@ -239,14 +303,26 @@ class SocketEvents:
                 anomalies = []
                 neck_angle  = angles.get('neck', 0)
                 trunk_angle = angles.get('trunk', 0)
-                if abs(neck_angle) > 40:
-                    anomalies.append(f"Neck flexion: {neck_angle:.1f}° (>40°)")
-                if abs(trunk_angle) > 60:
+                knee_l = angles.get('knee_left',  0)
+                knee_r = angles.get('knee_right', 0)
+                wrist_l = angles.get('wrist_left', 0)
+                wrist_r = angles.get('wrist_right', 0)
+                if neck_angle > 40:
+                    anomalies.append(f"Neck forward flexion: {neck_angle:.1f}° (>40°)")
+                elif neck_angle < -15:
+                    anomalies.append(f"Neck extension: {neck_angle:.1f}° (<-15°)")
+                if trunk_angle > 60:
                     anomalies.append(f"Trunk forward lean: {trunk_angle:.1f}° (>60°)")
+                elif trunk_angle < -10:
+                    anomalies.append(f"Trunk extension: {trunk_angle:.1f}°")
                 ua_left  = angles.get('upper_arm_left', 0)
                 ua_right = angles.get('upper_arm_right', 0)
                 if ua_left > 90 or ua_right > 90:
-                    anomalies.append("Shoulder elevated above 90°")
+                    anomalies.append(f"Shoulder elevated above 90° (L:{ua_left:.0f}° R:{ua_right:.0f}°)")
+                if max(knee_l, knee_r) > 60:
+                    anomalies.append(f"Deep knee flexion: {max(knee_l, knee_r):.0f}° (>60°)")
+                if abs(wrist_l) > 20 or abs(wrist_r) > 20:
+                    anomalies.append(f"Wrist deviation: L {wrist_l:.0f}° R {wrist_r:.0f}°")
 
                 # ── 7. IMU data (cached – refreshed every _imu_every frames) ──
                 if self._frame_count % _imu_every == 0 or self._imu_cache is None:
@@ -255,14 +331,16 @@ class SocketEvents:
                 # ── 8. Emit pose_update (throttled to 5 Hz max) ───────
                 now = time.time()
                 if now - last_emit >= _min_emit_dt:
+                    _last_angles   = angles
+                    _last_anomalies = anomalies
                     payload = {
                         'angles':       angles,
-                        'rula':         rula_res.get('RULA_score', 0),
-                        'reba':         reba_res.get('REBA_score', 0),
-                        'risk_level':   rula_res.get('risk_level', 'Low'),
+                        'rula':         _rula_committed,
+                        'reba':         _reba_committed,
+                        'risk_level':   _risk_committed,
                         'anomalies':    anomalies,
-                        'rula_details': rula_details,
-                        'reba_details': reba_details,
+                        'rula_details': _rula_details_committed,
+                        'reba_details': _reba_details_committed,
                         'imu':          self._imu_cache,
                         'ai_results':   ai_results,
                     }

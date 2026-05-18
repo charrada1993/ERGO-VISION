@@ -1,124 +1,370 @@
 # pose/skeleton.py
+# Corrected 3D joint-angle computation for RULA/REBA scoring.
+#
+# KEY FIXES applied (all 6 root causes from the diagnostic):
+#   RC-1  Y-axis flip  : MediaPipe Y-down → biomechanics Y-up
+#   RC-2  Intrinsics   : RGB intrinsics used for back-projection (not depth cam)
+#   RC-3  Depth units  : depth_mm / 1000.0 → metres (done in camera/manager.py but guarded here)
+#   RC-4  Rad→Deg      : all acos/atan2 results converted via np.degrees()
+#   RC-5  Gravity ref  : trunk axis = normalize(mid_shoulder − mid_hip) as vertical reference
+#   RC-6  acos clamp   : np.clip(dot, -1.0, 1.0) before every acos call
+#
+# MediaPipe landmark source:
+#   estimator.py returns pose_landmarks (normalised 0-1).
+#   When OAK-D depth is available, skeleton.py back-projects to metric 3D using
+#   RGB intrinsics + depth value.  Fall-back: pose_world_landmarks (metric, hip-centred).
+#
+# Angle sign convention (RULA/REBA):
+#   Flexion  → positive angle
+#   Extension→ negative angle
+#   All angles returned in DEGREES.
+
+import math
 import numpy as np
 
-# MediaPipe Pose landmark indices
-NOSE = 0
-LEFT_SHOULDER = 11
+# ── MediaPipe Pose landmark indices ───────────────────────────────────────────
+NOSE           =  0
+LEFT_EYE_INNER =  1
+LEFT_EYE       =  2
+RIGHT_EYE_INNER=  4
+RIGHT_EYE      =  5
+LEFT_SHOULDER  = 11
 RIGHT_SHOULDER = 12
-LEFT_ELBOW = 13
-RIGHT_ELBOW = 14
-LEFT_WRIST = 15
-RIGHT_WRIST = 16
-LEFT_HIP = 23
-RIGHT_HIP = 24
-LEFT_KNEE = 25
-RIGHT_KNEE = 26
-LEFT_ANKLE = 27
-RIGHT_ANKLE = 28
+LEFT_ELBOW     = 13
+RIGHT_ELBOW    = 14
+LEFT_WRIST     = 15
+RIGHT_WRIST    = 16
+LEFT_PINKY     = 17
+RIGHT_PINKY    = 18
+LEFT_INDEX     = 19
+RIGHT_INDEX    = 20
+LEFT_HIP       = 23
+RIGHT_HIP      = 24
+LEFT_KNEE      = 25
+RIGHT_KNEE     = 26
+LEFT_ANKLE     = 27
+RIGHT_ANKLE    = 28
+
+# Minimum landmark visibility to accept a point (MediaPipe confidence)
+VIS_THRESHOLD = 0.45
+# OAK-D Lite reliable depth range (metres)
+DEPTH_MIN_M = 0.35
+DEPTH_MAX_M = 3.5
+
+
+# ── Maths helpers ─────────────────────────────────────────────────────────────
+def _norm(v):
+    """Normalize a 3-vector. Returns zero-vector if near-singular."""
+    n = np.linalg.norm(v)
+    return v / (n + 1e-9)
+
+def _angle_deg(v1, v2):
+    """Unsigned angle [0°-180°] between two 3-vectors.  RC-4 + RC-6 safe."""
+    dot = np.dot(_norm(v1), _norm(v2))
+    dot = float(np.clip(dot, -1.0, 1.0))        # RC-6: clamp before acos
+    return math.degrees(math.acos(dot))           # RC-4: radians → degrees
+
+def _signed_angle_deg(v1, v2, plane_normal):
+    """Signed angle of v2 relative to v1 around plane_normal."""
+    angle = _angle_deg(v1, v2)
+    cross = np.cross(v1, v2)
+    sign  = np.sign(np.dot(cross, plane_normal))
+    return sign * angle
+
+
+# ── Back-projection helper ────────────────────────────────────────────────────
+def _backproject(u, v, depth_m, fx, fy, cx, cy):
+    """
+    Unproject pixel (u, v) at depth_m to metric 3D point in camera frame.
+    RC-2: must use RGB camera intrinsics, not depth camera intrinsics.
+    RC-3: depth_m must already be in metres (mm / 1000.0).
+    RC-1: Y is NEGATED to convert image-Y-down to biomechanics-Y-up.
+    """
+    X =  (u - cx) * depth_m / fx
+    Y = -((v - cy) * depth_m / fy)   # RC-1: flip Y
+    Z =  depth_m
+    return np.array([X, Y, Z], dtype=np.float64)
+
 
 class SkeletonBuilder:
     def __init__(self):
-        # Aspect ratio for coordinate correction (1280x720 = 16:9)
-        self.aspect_ratio = 16.0 / 9.0
-        # EMA smoothing factor (0.0 to 1.0; lower = smoother, more lag)
-        self.alpha = 0.4
+        # EMA alpha: 0.15 = 85% history, 15% current frame.
+        # Old value 0.4 caused ±10° jitter at scoring thresholds.
+        # At 8 fps, 0.15 gives ~3-frame lag — invisible to the assessor.
+        self.alpha = 0.15
         self._last_angles = {}
+        # Holdout: last known-good angles used during brief tracking dropout
+        self._holdout_angles = {}
+        self._dropout_frames = 0
+        self._MAX_DROPOUT    = 6   # hold scores for up to 6 missed frames (~0.75 s)
 
-    @staticmethod
-    def compute_euler(v):
+    # ─────────────────────────────────────────────────────────────────────────
+    # Public entry: compute angles from MediaPipe normalised landmarks + depth
+    # ─────────────────────────────────────────────────────────────────────────
+    def compute_angles(self, landmarks_norm, calib=None,
+                       depth_frame=None, world_landmarks=None,
+                       frame_w=1280, frame_h=720):
         """
-        Compute Pitch (flexion/extension) and Roll (abduction/adduction).
-        MediaPipe coordinate system: X right, Y down, Z forward.
+        landmarks_norm   : (33, 3) float32 — MediaPipe normalised [x,y,z] ∈ [0,1]
+        calib            : CameraCalibration instance (provides RGB intrinsics)
+        depth_frame      : (H, W) uint16  — OAK-D depth aligned to RGB, in mm
+        world_landmarks  : (33, 3) float32 — MediaPipe world coords (metric, hip-centre)
+        frame_w, frame_h : RGB frame dimensions (pixels)
+        Returns dict of joint angles in DEGREES, ready for RULA/REBA compute().
         """
-        vx, vy, vz = v
-        # Pitch (Flexion/Extension): sagittal plane (Y-Z)
-        pitch = np.degrees(np.arctan2(vz, vy))
-        # Roll (Abduction/Adduction): coronal plane (X-Y)
-        roll = np.degrees(np.arctan2(vx, vy))
-        return pitch, roll
-
-    def compute_angles(self, landmarks_3d):
-        """
-        Compute joint angles with Aspect Ratio Correction.
-        landmarks_3d: 33x3 normalized [x, y, z] from MediaPipe.
-        """
-        if landmarks_3d is None or len(landmarks_3d) < 33:
+        if landmarks_norm is None or len(landmarks_norm) < 33:
             return {}
 
-        # ── 1. Coordinate Correction ─────────────────────────────────────
-        # Normalize landmarks into a square space to fix 16:9 distortion.
-        # Per MediaPipe docs, 'z' uses roughly the same scale as 'x'.
-        lm = landmarks_3d.copy()
-        lm[:, 0] *= self.aspect_ratio
-        lm[:, 2] *= self.aspect_ratio
+        lm_n = landmarks_norm  # shape (33, 3)  x,y,z normalised
+
+        # ── Intrinsics ────────────────────────────────────────────────────
+        if calib is not None and hasattr(calib, 'rgb_intrinsics'):
+            K = calib.rgb_intrinsics
+            fx, fy = float(K[0, 0]), float(K[1, 1])
+            cx, cy = float(K[0, 2]), float(K[1, 2])
+        else:
+            # RC-2 fallback: approximate intrinsics for frame_w × frame_h
+            fx = fy = float(frame_w) * 1.2
+            cx, cy  = frame_w / 2.0, frame_h / 2.0
+
+        # ── Build metric 3D point for each landmark ───────────────────────
+        pts = {}   # idx → np.array([X, Y, Z]) in metres, Y-up
+
+        def _get_pt(idx):
+            """Return metric 3D point for landmark idx, with fallback chain."""
+            if idx in pts:
+                return pts[idx]
+
+            lm = lm_n[idx]
+            u = lm[0] * frame_w
+            v = lm[1] * frame_h
+
+            # Try OAK-D stereo depth first
+            pt = None
+            if depth_frame is not None:
+                ui, vi = int(round(u)), int(round(v))
+                dh, dw = depth_frame.shape[:2]
+                if 0 <= vi < dh and 0 <= ui < dw:
+                    # ── 3×3 median depth to kill single-pixel noise ──────
+                    r0, r1 = max(0, vi - 1), min(dh, vi + 2)
+                    c0, c1 = max(0, ui - 1), min(dw, ui + 2)
+                    patch   = depth_frame[r0:r1, c0:c1]
+                    valid   = patch[patch > 0]
+                    if valid.size >= 3:           # need at least 3 valid pixels
+                        depth_mm = float(np.median(valid))
+                    elif valid.size > 0:
+                        depth_mm = float(valid[0])
+                    else:
+                        depth_mm = 0.0
+                    depth_m = depth_mm / 1000.0   # RC-3: mm → metres
+                    if DEPTH_MIN_M <= depth_m <= DEPTH_MAX_M:
+                        pt = _backproject(u, v, depth_m, fx, fy, cx, cy)
+
+            # Fallback: MediaPipe world_landmarks (metric, hip-centred)
+            if pt is None and world_landmarks is not None:
+                wl = world_landmarks[idx]
+                pt = np.array([wl[0], wl[1], wl[2]], dtype=np.float64)
+
+            # Last resort: normalised coords treated as rough shape (no depth)
+            if pt is None:
+                # RC-1 Y-flip applied even on normalised data
+                pt = np.array([lm[0] - 0.5, -(lm[1] - 0.5), -lm[2]],
+                              dtype=np.float64)
+
+            pts[idx] = pt
+            return pt
+
+        # Pre-fetch key landmarks
+        nose        = _get_pt(NOSE)
+        l_shl       = _get_pt(LEFT_SHOULDER)
+        r_shl       = _get_pt(RIGHT_SHOULDER)
+        l_elbow     = _get_pt(LEFT_ELBOW)
+        r_elbow     = _get_pt(RIGHT_ELBOW)
+        l_wrist     = _get_pt(LEFT_WRIST)
+        r_wrist     = _get_pt(RIGHT_WRIST)
+        l_index     = _get_pt(LEFT_INDEX)
+        r_index     = _get_pt(RIGHT_INDEX)
+        l_hip       = _get_pt(LEFT_HIP)
+        r_hip       = _get_pt(RIGHT_HIP)
+        l_knee      = _get_pt(LEFT_KNEE)
+        r_knee      = _get_pt(RIGHT_KNEE)
+        l_ankle     = _get_pt(LEFT_ANKLE)
+        r_ankle     = _get_pt(RIGHT_ANKLE)
+
+        mid_shl = (l_shl + r_shl) / 2.0
+        mid_hip = (l_hip + r_hip) / 2.0
+
+        # ── RC-5: Gravity reference = trunk axis (body-relative vertical) ─
+        v_trunk  = mid_shl - mid_hip          # points upward along spine
+        v_up     = _norm(v_trunk)             # body vertical reference
+        # Sagittal plane normal (roughly X-axis = left-right)
+        v_right  = _norm(r_shl - l_shl)
+        # Frontal plane normal (roughly Z-axis = forward)
+        v_fwd    = _norm(np.cross(v_right, v_up))
 
         angles = {}
+
+        # ── TRUNK flexion ─────────────────────────────────────────────────
+        # Angle between trunk vector and global Y-up [0,1,0].
+        # 0° = upright, 90° = horizontal forward lean
+        global_up = np.array([0.0, 1.0, 0.0])
+        trunk_flex = _signed_angle_deg(global_up, v_trunk, v_right)
+        angles['trunk'] = trunk_flex   # positive = forward flexion
+
+        # Trunk lateral tilt (Roll): component in frontal plane
+        trunk_lat = _angle_deg(v_trunk, np.cross(v_right, global_up))
+        angles['trunk_mod'] = 1 if abs(trunk_lat) > 15 else 0
+        angles['trunk_roll'] = trunk_lat
+
+        # Trunk rotation (Yaw)
+        angles['trunk_rot'] = 0   # requires two-camera or IMU; set 0
+
+        # ── NECK (head) flexion ───────────────────────────────────────────
+        # Vector: mid_shoulder → nose  (head direction)
+        v_neck = nose - mid_shl
+        neck_flex = _signed_angle_deg(v_trunk, v_neck, v_right)
+        # Positive = head forward of trunk axis
+        angles['neck'] = neck_flex
+
+        # Neck lateral tilt
+        neck_lat = _signed_angle_deg(v_up, _norm(v_neck), v_fwd)
+        angles['neck_mod'] = 1 if abs(neck_lat) > 10 else 0
+        angles['neck_roll'] = neck_lat
+
+        # ── SHOULDER elevation (left) ────────────────────────────────────
+        # Upper-arm vector: shoulder → elbow
+        # Angle relative to trunk axis (RC-5)
+        v_ua_l = l_elbow - l_shl
+        # Elevation: angle between upper arm and trunk axis projected to sagittal
+        shl_elev_l = _angle_deg(-v_up, v_ua_l)   # 0°=arm along trunk, 90°=horizontal
+        angles['upper_arm_left'] = shl_elev_l
+
+        # Abduction (arm away from body midline)
+        v_ua_l_proj_frontal = v_ua_l - np.dot(v_ua_l, v_fwd) * v_fwd
+        abd_l = _angle_deg(v_up, v_ua_l_proj_frontal) if np.linalg.norm(v_ua_l_proj_frontal) > 1e-6 else 0.0
+        angles['shoulder_mod'] = 1 if abd_l > 20 else 0
+        angles['abd_l'] = abd_l
+
+        # ── SHOULDER elevation (right) ───────────────────────────────────
+        v_ua_r = r_elbow - r_shl
+        shl_elev_r = _angle_deg(-v_up, v_ua_r)
+        angles['upper_arm_right'] = shl_elev_r
         
-        # ── 2. Axial segments ────────────────────────────────────────────
-        # Neck angle (Shoulder midpoint to Nose)
-        shl_mid = (lm[LEFT_SHOULDER] + lm[RIGHT_SHOULDER]) / 2.0
-        neck_vec = lm[NOSE] - shl_mid
-        neck_pitch, neck_roll = self.compute_euler(-neck_vec)
-        angles['neck'] = neck_pitch
-        angles['neck_mod'] = 1 if abs(neck_roll) > 15 else 0
+        v_ua_r_proj_frontal = v_ua_r - np.dot(v_ua_r, v_fwd) * v_fwd
+        abd_r = _angle_deg(v_up, v_ua_r_proj_frontal) if np.linalg.norm(v_ua_r_proj_frontal) > 1e-6 else 0.0
+        angles['abd_r'] = abd_r
 
-        # Trunk angle (Hip midpoint to Shoulder midpoint)
-        hip_mid = (lm[LEFT_HIP] + lm[RIGHT_HIP]) / 2.0
-        trunk_vec = shl_mid - hip_mid
-        trunk_pitch, trunk_roll = self.compute_euler(-trunk_vec)
-        angles['trunk'] = trunk_pitch
-        angles['trunk_mod'] = 1 if abs(trunk_roll) > 15 else 0
+        # ── ELBOW flexion (left) ─────────────────────────────────────────
+        # Interior angle at elbow:
+        #   v1 = shoulder → elbow  (proximal limb seen from elbow)
+        #   v2 = wrist → elbow    (distal limb seen from elbow)
+        # Both vectors point AWAY from the elbow joint → interior angle.
+        # 180° = fully extended, 0° = fully flexed (impossible physically)
+        v1_l = l_shl - l_elbow    # shoulder direction from elbow
+        v2_l = l_wrist - l_elbow  # wrist direction from elbow
+        elbow_interior_l = _angle_deg(v1_l, v2_l)
+        angles['elbow_left'] = elbow_interior_l   # RULA uses this directly (60-100° = score 1)
 
-        # ── 3. Appendages (Left side primary for RULA/REBA) ──────────────
-        # Upper arm (shoulder to elbow)
-        ua_vec = lm[LEFT_ELBOW] - lm[LEFT_SHOULDER]
-        arm_pitch, arm_roll = self.compute_euler(ua_vec)
-        angles['upper_arm_left'] = arm_pitch
-        angles['shoulder_mod'] = 1 if abs(arm_roll) > 20 else 0
+        # ── ELBOW flexion (right) ────────────────────────────────────────
+        v1_r = r_shl - r_elbow
+        v2_r = r_wrist - r_elbow
+        elbow_interior_r = _angle_deg(v1_r, v2_r)
+        angles['elbow_right'] = elbow_interior_r
 
-        # Forearm (elbow to wrist)
-        fa_vec = lm[LEFT_WRIST] - lm[LEFT_ELBOW]
-        cos = np.dot(ua_vec, fa_vec) / (np.linalg.norm(ua_vec) * np.linalg.norm(fa_vec) + 1e-6)
-        angles['elbow_left'] = np.degrees(np.arccos(np.clip(cos, -1.0, 1.0)))
+        # ── WRIST flexion (left) ─────────────────────────────────────────
+        # Forearm axis: elbow → wrist
+        v_fa_l = l_wrist - l_elbow
+        # Hand axis: wrist → index finger MCP
+        v_hand_l = l_index - l_wrist
+        if np.linalg.norm(v_hand_l) > 1e-6:
+            # MediaPipe's INDEX is naturally offset ~15 deg from forearm axis
+            wrist_flex_l = max(0.0, _angle_deg(v_fa_l, v_hand_l) - 15.0)
+        else:
+            wrist_flex_l = 0.0
+        angles['wrist_left'] = wrist_flex_l
 
-        # Wrist Heuristic (MediaPipe Pose lacks hand joints, but has pinky/index)
-        # Flexion approximated by hand vector (wrist to mid-hand) relative to forearm
-        hand_mid = (lm[17] + lm[19]) / 2.0 # Left pinky + Left index
-        hand_vec = hand_mid - lm[LEFT_WRIST]
-        cos_w = np.dot(fa_vec, hand_vec) / (np.linalg.norm(fa_vec) * np.linalg.norm(hand_vec) + 1e-6)
-        angles['wrist_left'] = np.degrees(np.arccos(np.clip(cos_w, -1.0, 1.0)))
+        # ── WRIST flexion (right) ────────────────────────────────────────
+        v_fa_r = r_wrist - r_elbow
+        v_hand_r = r_index - r_wrist
+        if np.linalg.norm(v_hand_r) > 1e-6:
+            # MediaPipe's INDEX is naturally offset ~15 deg from forearm axis
+            wrist_flex_r = max(0.0, _angle_deg(v_fa_r, v_hand_r) - 15.0)
+        else:
+            wrist_flex_r = 0.0
+        angles['wrist_right'] = wrist_flex_r
 
-        # Legs stability (assume stable if standing)
+        # ── KNEE flexion (left) ──────────────────────────────────────────
+        # Interior angle at knee:
+        #   v_thigh = hip → knee
+        #   v_shank = ankle → knee
+        # 180° = straight, 90° = right-angle flex
+        v_thigh_l = l_hip - l_knee    # hip direction from knee
+        v_shank_l = l_ankle - l_knee  # ankle direction from knee
+        knee_interior_l = _angle_deg(v_thigh_l, v_shank_l)
+        # REBA uses flex_from_straight = 180 − interior
+        knee_flex_l = 180.0 - knee_interior_l
+        angles['knee_left'] = knee_flex_l
+
+        # ── KNEE flexion (right) ─────────────────────────────────────────
+        v_thigh_r = r_hip - r_knee
+        v_shank_r = r_ankle - r_knee
+        knee_interior_r = _angle_deg(v_thigh_r, v_shank_r)
+        knee_flex_r = 180.0 - knee_interior_r
+        angles['knee_right'] = knee_flex_r
+
+        # Legs stable heuristic
         angles['legs_stable'] = True
 
-        # ── 4. Right side ───────────────────────────────────────────────
-        ua_vec_r = lm[RIGHT_ELBOW] - lm[RIGHT_SHOULDER]
-        arm_pitch_r, _ = self.compute_euler(ua_vec_r)
-        angles['upper_arm_right'] = arm_pitch_r
-        
-        fa_vec_r = lm[RIGHT_WRIST] - lm[RIGHT_ELBOW]
-        cos_r = np.dot(ua_vec_r, fa_vec_r) / (np.linalg.norm(ua_vec_r) * np.linalg.norm(fa_vec_r) + 1e-6)
-        angles['elbow_right'] = np.degrees(np.arccos(np.clip(cos_r, -1.0, 1.0)))
+        # Hip flexion (for ErgoNet v2 inputs)
+        v_torso_l = l_shl - l_hip
+        v_thigh_down_l = l_knee - l_hip
+        hip_flex_l = _signed_angle_deg(v_torso_l, v_thigh_down_l, v_right)
+        angles['hip_left'] = hip_flex_l
+
+        v_torso_r = r_shl - r_hip
+        v_thigh_down_r = r_knee - r_hip
+        hip_flex_r = _signed_angle_deg(v_torso_r, v_thigh_down_r, v_right)
+        angles['hip_right'] = hip_flex_r
 
         return angles
 
-    def enrich_with_depth(self, angles, depth_frame, calib=None):
+    # ─────────────────────────────────────────────────────────────────────────
+    # EMA smoothing + dropout holdout
+    # ─────────────────────────────────────────────────────────────────────────
+    def enrich_with_depth(self, angles, depth_frame=None, calib=None):
         """
-        Provides temporal smoothing (EMA) and eventually metric back-projection.
-        Currently ensures stable angles for RULA/REBA scoring.
+        1. EMA temporal smoothing (alpha=0.15 → 85% history weight).
+        2. Dropout holdout: if called with empty angles (pose lost), returns
+           the last good smoothed angles for up to _MAX_DROPOUT frames,
+           preventing score flicker when MediaPipe briefly loses tracking.
         """
-        # Temporal smoothing (EMA) to stabilize scores
+        # ── Dropout path ──────────────────────────────────────────────────
+        if not angles:
+            self._dropout_frames += 1
+            if self._dropout_frames <= self._MAX_DROPOUT and self._holdout_angles:
+                return self._holdout_angles.copy()
+            return {}
+
+        self._dropout_frames = 0   # person visible again — reset counter
+
+        # ── First frame: seed history ─────────────────────────────────────
         if not self._last_angles:
-            self._last_angles = angles
+            self._last_angles    = angles.copy()
+            self._holdout_angles = angles.copy()
             return angles
-            
+
+        # ── EMA pass ─────────────────────────────────────────────────────
         smoothed = {}
         for k, v in angles.items():
             if isinstance(v, (int, float)) and k in self._last_angles:
-                # Apply 40% current / 60% history EMA
-                smoothed[k] = self.alpha * v + (1 - self.alpha) * self._last_angles[k]
+                prev = self._last_angles[k]
+                if isinstance(prev, (int, float)):
+                    smoothed[k] = self.alpha * v + (1 - self.alpha) * prev
+                else:
+                    smoothed[k] = v
             else:
                 smoothed[k] = v
-        
-        self._last_angles = smoothed
+
+        self._last_angles    = smoothed
+        self._holdout_angles = smoothed.copy()
         return smoothed

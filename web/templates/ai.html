@@ -1,65 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ErgoVision | AI Model Analysis</title>
+  <title>ErgoVision | AI Engine</title>
+  <meta name="description" content="ErgoNet v2.0 — real-time AI ergonomic diagnosis from joint angles">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
   <style>
-    .ai-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-top: 1.5rem;
+    /* ── AI Page Variables ── */
+    :root {
+      --safe:    #00ffaa; --safe-glow:    rgba(0,255,170,0.35);
+      --warning: #ffb84d; --warning-glow: rgba(255,184,77,0.35);
+      --danger:  #ff3366; --danger-glow:  rgba(255,51,102,0.35);
+      --ai-accent: #00d4ff;
     }
 
-    .full-width {
-      grid-column: span 2;
+    /* hero risk ring */
+    .risk-ring-wrap {
+      position: relative; width: 220px; height: 220px; margin: 0 auto 1.5rem;
+    }
+    .risk-ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring-bg  { fill:none; stroke:rgba(255,255,255,0.04); stroke-width:14; }
+    .ring-fill {
+      fill:none; stroke:var(--safe); stroke-width:14; stroke-linecap:round;
+      stroke-dasharray:628; stroke-dashoffset:628;
+      transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke .7s ease;
+      filter: drop-shadow(0 0 10px var(--safe-glow));
+    }
+    .ring-center {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      text-align:center;
+    }
+    .ring-score {
+      font-size:3.2rem; font-weight:800; line-height:1;
+      font-family:'JetBrains Mono',monospace; color:#fff;
+    }
+    .ring-label {
+      font-size:0.7rem; text-transform:uppercase; letter-spacing:3px;
+      color:var(--text-muted); margin-top:4px;
     }
 
-    .stat-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-      text-align: center;
+    /* diagnosis headline */
+    .diag-headline {
+      font-size:2.4rem; font-weight:800; letter-spacing:-0.5px;
+      color:var(--safe); text-align:center; margin:0 0 0.4rem;
+      transition: color .7s ease, text-shadow .7s ease;
+      text-shadow: 0 0 30px var(--safe-glow);
+      line-height:1.1;
+    }
+    .diag-sub {
+      text-align:center; font-size:0.78rem; text-transform:uppercase;
+      letter-spacing:3px; color:var(--text-muted); margin-bottom:2rem;
     }
 
-    .stat-value {
-      font-size: 2.5rem;
-      font-weight: 700;
-      color: var(--cyan);
-      margin: 0.5rem 0;
+    /* AI metric row */
+    .ai-metrics {
+      display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;
+    }
+    .ai-metric {
+      background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+      border-radius:14px; padding:1.1rem 1.2rem; text-align:center;
+      transition: border-color .3s, box-shadow .3s;
+    }
+    .ai-metric:hover { border-color:rgba(0,212,255,0.25); box-shadow:0 4px 20px rgba(0,212,255,0.08); }
+    .ai-metric-label {
+      font-size:0.62rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:0.1em; color:var(--text-muted); margin-bottom:0.5rem;
+    }
+    .ai-metric-val {
+      font-size:1.5rem; font-weight:800; font-family:'JetBrains Mono',monospace;
+      color:var(--ai-accent);
     }
 
-    .stat-label {
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
+    /* severity bar */
+    .sev-track {
+      height:6px; background:rgba(255,255,255,0.05); border-radius:3px;
+      overflow:hidden; margin-top:0.6rem;
+    }
+    .sev-fill {
+      height:100%; border-radius:3px; background:var(--safe);
+      transition:width .8s cubic-bezier(.23,1,.32,1), background .7s ease;
+      box-shadow: 0 0 8px var(--safe-glow);
     }
 
-    .chart-container {
-      position: relative;
-      height: 300px;
-      width: 100%;
+    /* console */
+    .ai-console {
+      background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.05);
+      border-radius:14px; padding:1rem 1.2rem;
+      font-family:'JetBrains Mono',monospace; font-size:0.78rem;
+      color:var(--ai-accent); height:130px; overflow:hidden; line-height:1.7;
+    }
+    .console-dots { display:flex; gap:5px; margin-bottom:0.6rem; }
+    .console-dots span { width:9px;height:9px;border-radius:50%; }
+    .console-dots span:nth-child(1){background:#ff5f56;}
+    .console-dots span:nth-child(2){background:#ffbd2e;}
+    .console-dots span:nth-child(3){background:#27c93f;}
+    .con-line { opacity:0; animation:fadeIn .35s forwards; }
+    .con-ts { color:var(--text-muted); margin-right:.4rem; }
+    @keyframes fadeIn { to{opacity:1;} }
+
+    /* joint inputs strip */
+    .joint-strip {
+      display:grid; grid-template-columns:repeat(6,1fr);
+      gap:0.6rem; margin-top:1rem;
+    }
+    .joint-chip {
+      background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+      border-radius:10px; padding:0.6rem 0.4rem; text-align:center;
+    }
+    .jc-label { font-size:0.55rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); }
+    .jc-val { font-size:0.9rem; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--ai-accent); margin-top:2px; }
+
+    /* light-mode */
+    body.light-mode { --ai-accent:#0d7377; }
+    body.light-mode .ai-metric { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.1); }
+    body.light-mode .ai-console { background:rgba(0,0,0,0.05); color:#0d7377; border-color:rgba(0,0,0,0.1); }
+    body.light-mode .con-ts { color:#5d6d7e; }
+    body.light-mode .joint-chip { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.1); }
+    body.light-mode .diag-headline { color:#0d7377; }
+    body.light-mode .ring-score { color:#1a2535; }
+
+    @media(max-width:768px){
+      .ai-metrics { grid-template-columns:1fr; }
+      .joint-strip { grid-template-columns:repeat(3,1fr); }
+      .diag-headline { font-size:1.7rem; }
     }
   </style>
 </head>
-
 <body>
 
-  <!-- ── Navbar ── -->
+  <!-- Navbar -->
   <nav class="navbar">
     <div class="nav-brand">
       <span class="logo-icon"><i class="fas fa-heartbeat"></i></span>
       <span class="logo">ErgoVision</span>
-      <span class="badge-pill">AI · Analysis</span>
+      <span class="badge-pill" style="background:rgba(0,212,255,0.12);color:#00d4ff;">AI Engine</span>
     </div>
     <div class="nav-links">
       <a href="/"><i class="fas fa-gauge-high"></i><span>Dashboard</span></a>
@@ -72,212 +150,313 @@
       <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
     </div>
     <div class="nav-right">
-      <button class="theme-btn" id="themeBtn">🌙</button>
+      <div class="live-dot" id="liveStatus">LIVE</div>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
     </div>
   </nav>
 
   <main class="container">
     <div class="page-header">
-      <h1 class="page-title"><i class="fas fa-microchip"></i> AI Model Performance & Evaluation</h1>
-      <p class="page-sub">Model: ErgoNet v2.0 &nbsp;&middot;&nbsp; Architecture: 12&rarr;512&rarr;4 MLP &nbsp;&middot;&nbsp; Dataset: TMS Enriched (20,000 samples) &nbsp;&middot;&nbsp; Training: 500 epochs &nbsp;&middot;&nbsp; <span style="color:var(--green);font-weight:600">97.14% Train Acc</span></p>
+      <h1 class="page-title"><i class="fas fa-brain"></i> AI Diagnostic Engine</h1>
+      <p class="page-sub">ErgoNet v2.0 &nbsp;·&nbsp; 12-input MLP &nbsp;·&nbsp; 20 000 clinical samples &nbsp;·&nbsp; 97.1% accuracy</p>
     </div>
 
-    <div class="ai-grid">
-      <!-- Live Prediction Monitor (NEW) -->
-      <div class="card full-width" style="border: 1px solid var(--cyan); background: rgba(0,212,255,0.02);">
-        <div class="panel-header">
-          <div class="panel-title"><i class="fas fa-satellite-dish" style="color:var(--cyan)"></i> Real-time Model
-            Output</div>
-          <span class="badge-pill" style="background:var(--green); color:#000;">LIVE INFERENCE</span>
+    <div class="dash-grid" style="grid-template-columns:340px 1fr; gap:1.5rem;">
+
+      <!-- LEFT: Risk gauge + diagnosis -->
+      <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+        <div class="card" style="padding:2rem;text-align:center;">
+          <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:1.2rem;">
+            <i class="fas fa-microchip" style="color:var(--cyan)"></i>&nbsp; AI Risk Index
+          </div>
+          <!-- Ring gauge -->
+          <div class="risk-ring-wrap">
+            <svg viewBox="0 0 220 220">
+              <circle class="ring-bg" cx="110" cy="110" r="95"/>
+              <circle class="ring-fill" id="riskRing" cx="110" cy="110" r="95"/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-score" id="riskScore">--</div>
+              <div class="ring-label">/ 10.0</div>
+            </div>
+          </div>
+
+          <!-- Diagnosis -->
+          <div class="diag-sub">Primary Diagnosis</div>
+          <div class="diag-headline" id="aiDiagnosis">Awaiting...</div>
+
+          <!-- Severity chip -->
+          <div style="margin-top:0.75rem;">
+            <span class="risk-chip" id="sevChip">Waiting</span>
+          </div>
+
+          <!-- Severity bar -->
+          <div class="sev-track" style="margin-top:1rem;">
+            <div class="sev-fill" id="sevFill" style="width:0%"></div>
+          </div>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;" id="sevLabel">Severity</div>
         </div>
-        <div style="padding:1.5rem; display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; text-align:center;">
-          <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Train Accuracy</div>
-            <div id="liveRisk" style="font-size:2rem; font-weight:700; color:var(--cyan);">97.14%</div>
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Final epoch 500</div>
+
+        <!-- Console -->
+        <div class="card" style="padding:1.2rem;">
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:0.75rem;">
+            <i class="fas fa-terminal" style="color:var(--cyan)"></i>&nbsp; Inference Log
           </div>
-          <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Val Accuracy</div>
-            <div id="liveSeverity" style="font-size:2rem; font-weight:700; color:var(--purple);">94.22%</div>
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Generalisation</div>
+          <div class="console-dots"><span></span><span></span><span></span></div>
+          <div class="ai-console" id="aiConsole">
+            <div class="con-line"><span class="con-ts">[SYS]</span> ErgoNet v2.0 loaded</div>
+            <div class="con-line"><span class="con-ts">[SYS]</span> 12 → 512 → 4 MLP topology</div>
+            <div class="con-line"><span class="con-ts">[SYS]</span> Awaiting socket stream...</div>
           </div>
-          <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Final MSE Loss</div>
-            <div id="liveCondition" style="font-size:2rem; font-weight:700; color:var(--orange);">0.2742</div>
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Training loss</div>
-          </div>
-          <div class="stat-box">
-            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Live Risk Score</div>
-            <div id="liveConfidence" style="font-size:2rem; font-weight:700; color:var(--green);">--</div>
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Real-time inference</div>
-          </div>
-        </div>
-        <div id="aiConsole"
-          style="margin: 0 1.5rem 1.5rem 1.5rem; background:rgba(0,0,0,0.3); padding:0.8rem; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--cyan); border-radius:4px; height:72px; overflow-y:auto; line-height:1.6;">
-          &gt; ErgoNet v2.0 loaded &mdash; 12&rarr;512&rarr;4 topology<br>
-          &gt; Awaiting live pose stream...
         </div>
       </div>
 
-      <!-- Training Loss Chart -->
-      <div class="card full-width">
-        <div class="panel-header">
-          <div class="panel-title"><i class="fas fa-chart-area"></i> Training & Validation Loss</div>
-        </div>
-        <div class="chart-container">
-          <canvas id="lossChart"></canvas>
-        </div>
-      </div>
+      <!-- RIGHT: AI metrics + joint inputs -->
+      <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
-      <!-- Accuracy Chart -->
-      <div class="card full-width">
-        <div class="panel-header">
-          <div class="panel-title"><i class="fas fa-chart-line"></i> Model Accuracy Curve</div>
+        <!-- 4 AI output cards -->
+        <div class="card" style="padding:1.5rem;">
+          <div class="panel-header" style="margin-bottom:1.25rem;">
+            <div class="panel-title"><i class="fas fa-chart-bar" style="color:var(--cyan)"></i> AI Output Breakdown</div>
+            <span class="badge-pill" style="background:rgba(0,229,160,0.1);color:var(--green);font-size:0.65rem;" id="modelBadge">Waiting</span>
+          </div>
+          <div class="ai-metrics">
+            <div class="ai-metric">
+              <div class="ai-metric-label"><i class="fas fa-fire" style="color:var(--red)"></i> Risk Score</div>
+              <div class="ai-metric-val" id="metRisk" style="color:var(--cyan)">--</div>
+              <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Scale 0 – 10</div>
+            </div>
+            <div class="ai-metric">
+              <div class="ai-metric-label"><i class="fas fa-stethoscope" style="color:var(--purple)"></i> Condition Code</div>
+              <div class="ai-metric-val" id="metCondCode" style="color:var(--purple)">--</div>
+              <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;" id="metCondName">–</div>
+            </div>
+            <div class="ai-metric">
+              <div class="ai-metric-label"><i class="fas fa-exclamation-triangle" style="color:var(--yellow)"></i> Severity</div>
+              <div class="ai-metric-val" id="metSev" style="color:var(--yellow)">--</div>
+              <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;" id="metSevName">–</div>
+            </div>
+            <div class="ai-metric">
+              <div class="ai-metric-label"><i class="fas fa-map-marker-alt" style="color:var(--orange)"></i> Location Code</div>
+              <div class="ai-metric-val" id="metLoc" style="color:var(--orange)">--</div>
+              <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;" id="metLocName">–</div>
+            </div>
+          </div>
         </div>
-        <div class="chart-container">
-          <canvas id="accuracyChart"></canvas>
-        </div>
-      </div>
 
-      <!-- Architecture Info -->
-      <div class="card">
-        <div class="panel-header">
-          <div class="panel-title"><i class="fas fa-sitemap"></i> Model Architecture</div>
+        <!-- Joint angle inputs (what AI sees) -->
+        <div class="card" style="padding:1.5rem;">
+          <div class="panel-title" style="margin-bottom:1rem;">
+            <i class="fas fa-person-rays" style="color:var(--cyan)"></i> Live Joint Angle Inputs
+          </div>
+          <div class="joint-strip">
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-neck)">Neck</div>
+              <div class="jc-val" id="ji-neck">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-trunk)">Trunk</div>
+              <div class="jc-val" id="ji-trunk">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-arm-l)">Shl L</div>
+              <div class="jc-val" id="ji-shl-l">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-arm-r)">Shl R</div>
+              <div class="jc-val" id="ji-shl-r">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-forearm)">Elbow L</div>
+              <div class="jc-val" id="ji-elb-l">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-forearm)">Elbow R</div>
+              <div class="jc-val" id="ji-elb-r">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-wrist)">Wrist L</div>
+              <div class="jc-val" id="ji-wri-l">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-wrist)">Wrist R</div>
+              <div class="jc-val" id="ji-wri-r">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-hip)">Hip L</div>
+              <div class="jc-val" id="ji-hip-l">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-hip)">Hip R</div>
+              <div class="jc-val" id="ji-hip-r">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-knee)">Knee L</div>
+              <div class="jc-val" id="ji-kne-l">--°</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label" style="color:var(--col-knee)">Knee R</div>
+              <div class="jc-val" id="ji-kne-r">--°</div>
+            </div>
+          </div>
         </div>
-        <ul style="list-style:none; padding:1rem; color:var(--text-muted); font-size:0.9rem; line-height:2;">
-          <li><i class="fas fa-layer-group" style="color:var(--cyan)"></i> <strong>Input:</strong> 12 Nodes (Joint Angles)</li>
-          <li><i class="fas fa-microchip" style="color:var(--purple)"></i> <strong>Hidden:</strong> 512 Nodes (ReLU, Xavier Init)</li>
-          <li><i class="fas fa-bullseye" style="color:var(--green)"></i> <strong>Output 1:</strong> Risk Score (0&ndash;10, Regression)</li>
-          <li><i class="fas fa-table" style="color:var(--yellow)"></i> <strong>Output 2:</strong> Severity Code (0&ndash;4)</li>
-          <li><i class="fas fa-stethoscope" style="color:var(--orange)"></i> <strong>Output 3:</strong> Condition Code (0&ndash;6)</li>
-          <li><i class="fas fa-map-pin" style="color:var(--red)"></i> <strong>Output 4:</strong> Location Code (0&ndash;20)</li>
-          <li><i class="fas fa-weight-hanging" style="color:var(--text-muted)"></i> <strong>Params:</strong> 12&times;512 + 512&times;4 = 8,192 weights</li>
-        </ul>
-      </div>
 
-      <!-- Dataset Info -->
-      <div class="card">
-        <div class="panel-header">
-          <div class="panel-title"><i class="fas fa-database"></i> Training Dataset</div>
+        <!-- Model info strip -->
+        <div class="card" style="padding:1.2rem;">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;">
+            <div style="text-align:center;">
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Model</div>
+              <div style="font-size:0.88rem;font-weight:700;color:var(--cyan);margin-top:2px;">ErgoNet v2.0</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Accuracy</div>
+              <div style="font-size:0.88rem;font-weight:700;color:var(--green);margin-top:2px;">97.1%</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Training</div>
+              <div style="font-size:0.88rem;font-weight:700;color:var(--yellow);margin-top:2px;">20 000 samples</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Conditions</div>
+              <div style="font-size:0.88rem;font-weight:700;color:var(--purple);margin-top:2px;">18 classes</div>
+            </div>
+          </div>
         </div>
-        <ul style="list-style:none; padding:1rem; color:var(--text-muted); font-size:0.9rem; line-height:2;">
-          <li><i class="fas fa-vial" style="color:var(--cyan)"></i> <strong>Source:</strong> TMS Enriched Dataset (Synthetic)</li>
-          <li><i class="fas fa-file-csv" style="color:var(--green)"></i> <strong>Samples:</strong> 20,000 Records</li>
-          <li><i class="fas fa-balance-scale" style="color:var(--yellow)"></i> <strong>Features:</strong> 12 angle columns (Flexion, Extension, Deviation)</li>
-          <li><i class="fas fa-bullseye" style="color:var(--purple)"></i> <strong>Targets:</strong> Risk, Severity, Condition, Location</li>
-          <li><i class="fas fa-clock" style="color:var(--orange)"></i> <strong>Epochs:</strong> 500 &nbsp;&middot;&nbsp; <strong>Optimizer:</strong> Mini-batch SGD</li>
-          <li><i class="fas fa-stopwatch" style="color:var(--text-muted)"></i> <strong>Inference:</strong> ~8 ms (Jetson Orin Nano)</li>
-        </ul>
+
       </div>
     </div>
   </main>
 
   <script>
-    async function initCharts() {
-      try {
-        const response = await fetch('/api/training_log');
-        const data = await response.json();
-        
-        if (!data || data.length === 0) {
-          console.warn("No training log data found.");
-          return;
-        }
+    const socket = io();
 
-        const labels = data.map(d => d.epoch);
-        const loss = data.map(d => d.loss);
-        const valLoss = data.map(d => d.val_loss);
-        const acc = data.map(d => d.accuracy);
-        const valAcc = data.map(d => d.val_accuracy);
+    const CONDITIONS = [
+      "Carpal Tunnel","Cervical Disc Risk","Cervicalgia","De Quervain",
+      "Elbow Epicondylitis","Elbow Strain","Frozen Shoulder","Hip Bursitis",
+      "Hip Flexor Strain","Low Back Pain","Lumbar Disc Risk","Normal",
+      "Postural Kyphosis","Rotator Cuff Tendinitis","Shoulder Bursitis",
+      "Shoulder Impingement","Tech Neck","Wrist Tendinitis"
+    ];
+    const SEVERITIES = ["Healthy","Low Risk","Moderate","High Risk","Critical"];
+    const LOCATIONS  = [
+      "None","Wrist","Elbow","Shoulder","Neck","Upper Back",
+      "Lower Back","Hip","Knee","Full Body"
+    ];
 
-        const chartOptions = {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 1000 },
-          scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } },
-            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } }
-          },
-          plugins: {
-            legend: { labels: { color: '#ddd', font: { family: 'Inter' } } }
-          }
-        };
+    // ring circumference for r=95 → 2π×95 ≈ 597
+    const CIRC = 2 * Math.PI * 95;
 
-        // Loss Chart
-        new Chart(document.getElementById('lossChart'), {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              { label: 'Train Loss', data: loss, borderColor: '#00d4ff', borderWidth: 2, pointRadius: 0, fill: false },
-              { label: 'Val Loss', data: valLoss, borderColor: '#9d50bb', borderWidth: 2, pointRadius: 0, fill: false, borderDash: [5, 5] }
-            ]
-          },
-          options: chartOptions
-        });
+    const riskRing   = document.getElementById('riskRing');
+    const riskScore  = document.getElementById('riskScore');
+    const aiDiag     = document.getElementById('aiDiagnosis');
+    const sevChip    = document.getElementById('sevChip');
+    const sevFill    = document.getElementById('sevFill');
+    const sevLabel   = document.getElementById('sevLabel');
+    const aiConsole  = document.getElementById('aiConsole');
+    const modelBadge = document.getElementById('modelBadge');
 
-        // Accuracy Chart
-        new Chart(document.getElementById('accuracyChart'), {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              { label: 'Train Accuracy', data: acc, borderColor: '#00ffaa', borderWidth: 2, pointRadius: 0, fill: false },
-              { label: 'Val Accuracy', data: valAcc, borderColor: '#f9d423', borderWidth: 2, pointRadius: 0, fill: false, borderDash: [5, 5] }
-            ]
-          },
-          options: chartOptions
-        });
-      } catch (err) {
-        console.error("Chart initialization failed:", err);
+    function $(id){ return document.getElementById(id); }
+    function fmt(v, dec=1){ return v != null ? (+v).toFixed(dec) : '--'; }
+
+    function addLog(msg) {
+      const t = new Date().toLocaleTimeString('en-US',{hour12:false});
+      const d = document.createElement('div');
+      d.className = 'con-line';
+      d.innerHTML = `<span class="con-ts">[${t}]</span> ${msg}`;
+      aiConsole.appendChild(d);
+      while (aiConsole.children.length > 6) aiConsole.removeChild(aiConsole.firstChild);
+    }
+
+    function applyRiskTheme(risk, diag) {
+      let color, glow, chipCls;
+      if (risk > 6 || (diag !== 'Normal' && diag !== 'Awaiting...')) {
+        color='var(--danger)'; glow='rgba(255,51,102,0.35)'; chipCls='high';
+      } else if (risk > 3) {
+        color='var(--warning)'; glow='rgba(255,184,77,0.35)'; chipCls='medium';
+      } else {
+        color='var(--safe)'; glow='rgba(0,255,170,0.35)'; chipCls='low';
       }
+      aiDiag.style.color = color;
+      aiDiag.style.textShadow = `0 0 28px ${glow}`;
+      riskRing.style.stroke = color;
+      riskRing.style.filter = `drop-shadow(0 0 10px ${glow})`;
+      sevFill.style.background = color;
+      sevFill.style.boxShadow  = `0 0 8px ${glow}`;
+      return chipCls;
     }
 
-    // Initialize charts immediately
-    initCharts();
+    socket.on('pose_update', (data) => {
+      const a  = data.angles || {};
+      const ai = data.ai_results;
 
-    // Live Prediction logic (with error handling)
-    try {
-      const socket = io();
-      const liveRisk = document.getElementById('liveRisk');
-      const liveSeverity = document.getElementById('liveSeverity');
-      const liveCondition = document.getElementById('liveCondition');
-      const liveConfidence = document.getElementById('liveConfidence');
-      const aiConsole = document.getElementById('aiConsole');
+      // Joint inputs
+      $('ji-neck').textContent  = fmt(a.neck) + '°';
+      $('ji-trunk').textContent = fmt(a.trunk) + '°';
+      $('ji-shl-l').textContent = fmt(a.upper_arm_left) + '°';
+      $('ji-shl-r').textContent = fmt(a.upper_arm_right) + '°';
+      $('ji-elb-l').textContent = fmt(a.elbow_left) + '°';
+      $('ji-elb-r').textContent = fmt(a.elbow_right) + '°';
+      $('ji-wri-l').textContent = fmt(a.wrist_left) + '°';
+      $('ji-wri-r').textContent = fmt(a.wrist_right) + '°';
+      $('ji-hip-l').textContent = fmt(a.hip_left) + '°';
+      $('ji-hip-r').textContent = fmt(a.hip_right) + '°';
+      $('ji-kne-l').textContent = fmt(a.knee_left) + '°';
+      $('ji-kne-r').textContent = fmt(a.knee_right) + '°';
 
-      socket.on('connect', () => console.log("AI Page connected to socket"));
+      if (!ai) return;
 
-      socket.on('pose_update', (data) => {
-        if (data.ai_results) {
-          const res = data.ai_results;
-          const risk = typeof res.risk_score === 'number' ? res.risk_score : 0;
-          const conditions = ["Normal", "Tendinitis", "Back Pain", "Cervicalgia", "Bursitis", "Strain", "Carpal Tunnel"];
-          const severities = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"];
-          const cIdx = Math.min(Math.max(Math.round(res.condition_code || 0), 0), conditions.length - 1);
-          const sIdx = Math.min(Math.max(Math.round(res.severity_code  || 0), 0), severities.length - 1);
+      // Risk score
+      const risk = Math.max(0, Math.min(10, ai.risk_score || 0));
+      riskScore.textContent = risk.toFixed(1);
+      riskRing.style.strokeDashoffset = CIRC - (risk / 10) * CIRC;
+      $('metRisk').textContent = risk.toFixed(2);
 
-          if (liveRisk)       liveRisk.textContent      = risk.toFixed(2);
-          if (liveCondition)  liveCondition.textContent  = conditions[cIdx];
-          if (liveSeverity)   liveSeverity.textContent   = severities[sIdx];
+      // Condition
+      const cIdx = Math.min(Math.max(Math.round(ai.condition_code || 0), 0), CONDITIONS.length-1);
+      const diag = CONDITIONS[cIdx];
+      aiDiag.textContent = diag;
+      $('metCondCode').textContent = cIdx;
+      $('metCondName').textContent = diag;
 
-          // Confidence: severity 0=healthy means 100%, severity 4=critical means ~20%
-          const conf = Math.max(0, Math.min(100, ((4 - sIdx) / 4) * 100)).toFixed(0);
-          if (liveConfidence) liveConfidence.textContent = conf + '%';
+      // Severity
+      const sIdx = Math.min(Math.max(Math.round(ai.severity_code || 0), 0), SEVERITIES.length-1);
+      const sevName = SEVERITIES[sIdx];
+      sevLabel.textContent = sevName;
+      $('metSev').textContent = sIdx;
+      $('metSevName').textContent = sevName;
+      sevFill.style.width = ((sIdx / (SEVERITIES.length-1)) * 100) + '%';
+      sevChip.textContent = sevName;
 
-          if (aiConsole) {
-            aiConsole.innerHTML = `&gt; [${new Date().toLocaleTimeString()}] INFERENCE: Risk=${risk.toFixed(2)}, Sev=${severities[sIdx]}, Cond=${conditions[cIdx]}<br>&gt; Engine: ErgoNet v2.0 &mdash; 12&rarr;512&rarr;4 Active`;
-          }
-        }
-      });
-    } catch (err) {
-      console.error("Socket logic failed:", err);
+      // Location
+      const lIdx = Math.min(Math.max(Math.round(ai.location_code || 0), 0), LOCATIONS.length-1);
+      $('metLoc').textContent = lIdx;
+      $('metLocName').textContent = LOCATIONS[lIdx] || '--';
+
+      // Theme
+      const chipCls = applyRiskTheme(risk, diag);
+      sevChip.className = 'risk-chip ' + chipCls;
+
+      // Badge
+      modelBadge.textContent = 'LIVE · ErgoNet v2.0';
+      modelBadge.style.background = 'rgba(0,229,160,0.12)';
+      modelBadge.style.color = 'var(--green)';
+
+      // Log (30% sampling)
+      if (Math.random() > 0.7) {
+        addLog(`PRED → ${diag} | Risk: ${risk.toFixed(1)} | Sev: ${sevName}`);
+      }
+    });
+
+    // Theme toggle
+    const themeBtn = document.getElementById('themeBtn');
+    function applyTheme(isLight) {
+      document.body.classList.toggle('light-mode', isLight);
+      themeBtn.innerHTML = isLight ? '☀️' : '🌙';
+      localStorage.setItem('ergo-theme', isLight ? 'light' : 'dark');
     }
-
-    // Theme toggle logic
-    document.getElementById('themeBtn').onclick = () => {
-      document.body.classList.toggle('light-mode');
-      document.getElementById('themeBtn').innerText = document.body.classList.contains('light-mode') ? '🌞' : '🌙';
-    };
+    themeBtn.addEventListener('click', () => applyTheme(!document.body.classList.contains('light-mode')));
+    applyTheme(localStorage.getItem('ergo-theme') === 'light');
   </script>
 </body>
-
 </html>

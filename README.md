@@ -392,13 +392,13 @@ from ergonomics.reba import REBACalculator
 rula = RULACalculator()
 reba = REBACalculator()
 
-result = rula.compute(angles, load_kg=0, repetitive=False)
+result = rula.compute(angles)
 # result['RULA_score']     → 1–7
 # result['risk_level']     → text label
 # result['score_A'], ['score_B'], ['score_C']
 # result['upper_arm_score'], ['lower_arm_score'], ['wrist_score'], ...
 
-result = reba.compute(angles, load_kg=0, grip=0, repetitive=False)
+result = reba.compute(angles)
 # result['REBA_score']     → 1–15
 # result['table_A'], ['table_B'], ['score_C']
 # result['trunk_score'], ['neck_score'], ['legs_score'], ...
@@ -412,7 +412,8 @@ result = reba.compute(angles, load_kg=0, grip=0, repetitive=False)
 
 - **Flask** serves all HTML pages
 - **Socket.IO** emits `pose_update` events at ~10 Hz with:
-  - Joint angles
+  - Real-time charts, 3D skeleton, video feed, IMU telemetry
+  - **Joint Angle Trends:** 12 individual real-time charts tracking Neck, Trunk, Shoulder, Elbow, Wrist, and Knee angles
   - RULA/REBA scores and sub-scores
   - Risk level and anomaly list
   - Visual IMU data (roll, pitch, yaw)
@@ -457,9 +458,6 @@ result = reba.compute(angles, load_kg=0, grip=0, repetitive=False)
 | | 15°–30° | 2 |
 | | > 30° | 3 |
 | | +lateral deviation | +1 |
-| **Load** | < 2 kg | 0 |
-| | ≤ 10 kg / repetitive | 1 |
-| | > 10 kg | 2 |
 
 ### Group B — Neck, Trunk, Legs
 
@@ -521,18 +519,6 @@ result = reba.compute(angles, load_kg=0, grip=0, repetitive=False)
 | **Wrist** | Neutral | 1 |
 | | Flex/ext > 15° | 2 |
 | | +lateral deviation | +1 |
-
-### REBA Adjustments
-
-| Factor | Score |
-|---|---|
-| Load < 5 kg | 0 |
-| Load 5–10 kg | 1 |
-| Load > 10 kg | 2 |
-| Good grip | +0 |
-| Average grip | +1 |
-| Poor grip | +2 |
-| Repetitive / prolonged posture | +1 |
 
 ### REBA Final Score Interpretation
 

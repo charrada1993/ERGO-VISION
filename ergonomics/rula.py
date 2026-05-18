@@ -7,21 +7,20 @@ class RULACalculator:
     # Group A – Upper arm, Lower arm, Wrist
     # ------------------------------------------------------------------
     @staticmethod
-    def score_upper_arm(angle, rotated=False, supported=False):
+    def score_upper_arm(angle, rotated=False):
         """
         Tableau 1 (rula_text.txt):
-          neutre / long du corps  → 1
-          élévation < 20°         → 2
-          élévation 20–45°        → 2
-          élévation 45–90°        → 3
-          élévation > 90°         → 4
-        Additionnels: rotation ext/int → +1 ; bras soutenu ou charge modérée → +1
+          neutre / long du corps (≤20°) → 1
+          élévation 20–45°              → 2
+          élévation 45–90°              → 3
+          élévation > 90°               → 4
+        Additionnels: rotation ext/int → +1 ; bras soutenu → +1
+
+        FIX: neutral zone is ≤20°, not only exactly 0°.
         """
         a = abs(angle)
-        if a == 0:
-            s = 1
-        elif a < 20:
-            s = 2
+        if a <= 20:
+            s = 1          # neutral — arm along or close to trunk
         elif a <= 45:
             s = 2
         elif a <= 90:
@@ -30,7 +29,6 @@ class RULACalculator:
             s = 4
 
         if rotated:   s += 1
-        if supported: s += 1
         return min(max(s, 1), 6)
 
     @staticmethod
@@ -86,12 +84,16 @@ class RULACalculator:
             (1, 2): [2, 2, 3, 3],
             (2, 1): [2, 3, 3, 3],
             (2, 2): [3, 3, 4, 4],
-            (3, 1): [3, 3, 4, 4],
-            (3, 2): [4, 4, 5, 5],
-            (4, 1): [4, 4, 5, 5],
-            (4, 2): [5, 5, 6, 6],
+            (3, 1): [3, 4, 4, 4],
+            (3, 2): [4, 4, 4, 5],
+            (4, 1): [4, 4, 4, 5],
+            (4, 2): [5, 5, 5, 6],
+            (5, 1): [5, 5, 5, 6],
+            (5, 2): [5, 6, 6, 7],
+            (6, 1): [7, 7, 7, 8],
+            (6, 2): [8, 8, 8, 9],
         }
-        ua = min(max(upper_arm, 1), 4)
+        ua = min(max(upper_arm, 1), 6)
         la = min(max(lower_arm, 1), 2)
         row = table.get((ua, la), [1, 2, 2, 3])
         # Column index: wrist + wrist_twist combined, clamped 1-4
@@ -158,6 +160,20 @@ class RULACalculator:
         return 1 if stable else 2
 
     @staticmethod
+    def score_knee(flex_deg):
+        """
+        Knee flexion modifier used by REBA (kept here for shared reference).
+          flex < 30°  → +0
+          30–60°      → +1
+          > 60°       → +2
+        """
+        if flex_deg < 30:
+            return 0
+        elif flex_deg <= 60:
+            return 1
+        return 2
+
+    @staticmethod
     def group_b_table(neck, trunk, legs):
         """
         Tableau Groupe B (rula_text.txt) – Cou (rows) × Tronc (cols):
@@ -210,13 +226,21 @@ class RULACalculator:
     # Main compute entry point
     # ------------------------------------------------------------------
     def compute(self, angles):
-        # ── Group A ────────────────────────────────────────────────────
-        ua    = self.score_upper_arm(
-                    angles.get('upper_arm_left', 0),
-                    rotated=(angles.get('shoulder_mod', 0) > 0))
-        la    = self.score_lower_arm(angles.get('elbow_left', 90))
-        wrist = self.score_wrist(angles.get('wrist_left', 0))
-        # wrist_twist=1 (neutral) – MediaPipe doesn't give hand axial rotation
+        # ── Group A — worst side ───────────────────────────────────────
+        ua_l = self.score_upper_arm(angles.get('upper_arm_left',  0),
+                                    rotated=(angles.get('shoulder_mod', 0) > 0))
+        ua_r = self.score_upper_arm(angles.get('upper_arm_right', 0))
+        ua   = max(ua_l, ua_r)
+
+        la_l = self.score_lower_arm(angles.get('elbow_left',  90))
+        la_r = self.score_lower_arm(angles.get('elbow_right', 90))
+        la   = max(la_l, la_r)
+
+        w_l  = self.score_wrist(angles.get('wrist_left',  0))
+        w_r  = self.score_wrist(angles.get('wrist_right', 0))
+        wrist = max(w_l, w_r)
+
+        # wrist_twist = 1 (neutral) – MediaPipe Pose has no hand axial rotation
         groupA = self.group_a_table(ua, la, wrist, 1)
 
         # ── Group B ────────────────────────────────────────────────────
@@ -246,8 +270,6 @@ class RULACalculator:
             "neck_score":      neck,
             "trunk_score":     trunk,
             "legs_score":      legs,
-            "muscle_score":    0,
-            "activity_score":  0,
         }
 
     # ------------------------------------------------------------------

@@ -6,7 +6,7 @@ import pickle
 import sys
 import json
 import matplotlib
-matplotlib.use('TkAgg')  # Use TkAgg backend for terminal/display output
+matplotlib.use('Agg')  # Headless — no display needed on Jetson
 import matplotlib.pyplot as plt
 
 # Add project root to sys.path
@@ -162,7 +162,10 @@ def train_v2():
 
     plt.suptitle("Model Training Performance", fontsize=16)
     plt.tight_layout()
-    plt.show()
+    chart_path = os.path.join(base_dir, "data", "training_chart.png")
+    plt.savefig(chart_path, dpi=120, bbox_inches='tight')
+    plt.close()
+    print(f"[AI-v2] Training chart saved to {chart_path}")
 
 if __name__ == "__main__":
     train_v2()

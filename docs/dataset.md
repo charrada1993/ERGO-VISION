@@ -67,7 +67,7 @@ The simulator samples random joint angles within anatomically valid ranges:
 For each angle set, the system computes the **3D XYZ coordinates** of all 33 MediaPipe landmarks, creating a perfect ground truth that links landmark geometry to precise angle values.
 
 ### C. Automatic RULA/REBA Labeling
-Every generated posture is passed through the **official RULA/REBA scoring engine** to assign clinical scores. The AI then learns: *"When I see these angles, the risk state is X."*
+Every generated posture is passed through the **official angle-based RULA/REBA scoring engine** to assign clinical scores (devoid of subjective load/effort metrics). The AI then learns: *"When I see these angles, the risk state is X."*
 
 ### D. TMS Enrichment
 The dataset is additionally enriched with **condition-specific patterns**:

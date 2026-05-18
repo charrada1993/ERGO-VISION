@@ -144,18 +144,15 @@
     document.addEventListener('DOMContentLoaded', () => {
       // Theme toggle logic
       const themeBtn = document.getElementById('themeBtn');
-      if (themeBtn) {
-        themeBtn.addEventListener('click', () => {
-          document.body.classList.toggle('light-mode');
-          const isLight = document.body.classList.contains('light-mode');
-          themeBtn.textContent = isLight ? '☀️' : '🌙';
-          localStorage.setItem('theme', isLight ? 'light' : 'dark');
-        });
-        if (localStorage.getItem('theme') === 'light') {
-          document.body.classList.add('light-mode');
-          themeBtn.textContent = '☀️';
-        }
+      function applyTheme(isLight) {
+        document.body.classList.toggle('light-mode', isLight);
+        themeBtn.innerHTML = isLight ? '☀️' : '🌙';
+        localStorage.setItem('ergo-theme', isLight ? 'light' : 'dark');
       }
+      themeBtn.addEventListener('click', () => {
+        applyTheme(!document.body.classList.contains('light-mode'));
+      });
+      applyTheme(localStorage.getItem('ergo-theme') === 'light');
 
       const select = document.getElementById('sessionSelect');
       const btn = document.getElementById('btnGenerate');

@@ -32,7 +32,7 @@
     </div>
     <div class="nav-right">
       <div class="live-dot">LIVE</div>
-      <button class="theme-btn" id="themeBtn">🌙</button>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
     </div>
   </nav>
 
@@ -135,18 +135,11 @@
             <span class="ss-score" id="sc-legs" style="color:var(--col-knee)">--</span>
           </div>
           <div class="sub-score">
-            <span class="ss-label">Muscle Use</span>
+            <span class="ss-label">Score C (Total)</span>
             <div class="ss-bar">
-              <div class="ss-fill" id="bar-muscle" style="background:var(--green);width:0%"></div>
+              <div class="ss-fill" id="bar-score_c" style="background:var(--purple);width:0%"></div>
             </div>
-            <span class="ss-score" id="sc-muscle" style="color:var(--green)">--</span>
-          </div>
-          <div class="sub-score">
-            <span class="ss-label">Activity Score</span>
-            <div class="ss-bar">
-              <div class="ss-fill" id="bar-activity" style="background:var(--cyan);width:0%"></div>
-            </div>
-            <span class="ss-score" id="sc-activity" style="color:var(--cyan)">--</span>
+            <span class="ss-score" id="sc-score_c" style="color:var(--purple); font-weight:700;">--</span>
           </div>
         </div>
       </div>
@@ -344,8 +337,7 @@
         ['neck', d.neck, 6],
         ['trunk', d.trunk, 6],
         ['legs', d.legs, 2],
-        ['muscle', d.muscle, 1],
-        ['activity', d.activity, 1],
+        ['score_c', d.score_c, 7]
       ];
       scoreMap.forEach(([key, val, max]) => {
         setText('sc-' + key, val ?? '--');
@@ -363,11 +355,11 @@
       }
       rulaHistChart.update('none');
 
-      // Joint mini charts
+      // Joint mini charts — use correct angle keys
       push(cArm, +(a.upper_arm_left || 0));
-      push(cNeck, +(a.neck || 0));
-      push(cForearm, +(a.lower_arm_left || a.forearm || 0));
-      push(cWrist, +(a.wrist_left || a.wrist || 0));
+      push(cNeck, Math.abs(+(a.neck || 0)));
+      push(cForearm, +(a.elbow_left || 0));
+      push(cWrist, Math.abs(+(a.wrist_left || 0)));
     });
 
     function updateChartsTheme(isLight) {

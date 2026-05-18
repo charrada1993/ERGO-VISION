@@ -32,7 +32,7 @@
     </div>
     <div class="nav-right">
       <div class="live-dot">LIVE</div>
-      <button class="theme-btn" id="themeBtn">🌙</button>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
     </div>
   </nav>
 
@@ -162,13 +162,6 @@
               <div class="ss-fill" id="bar-wrist-twist" style="background:var(--orange);width:0%"></div>
             </div>
             <span class="ss-score" id="sc-wrist-twist" style="color:var(--orange)">--</span>
-          </div>
-          <div class="sub-score">
-            <span class="ss-label">Coupling / Grip</span>
-            <div class="ss-bar">
-              <div class="ss-fill" id="bar-coupling" style="background:var(--yellow);width:0%"></div>
-            </div>
-            <span class="ss-score" id="sc-coupling" style="color:var(--yellow)">--</span>
           </div>
         </div>
       </div>
@@ -402,7 +395,6 @@
         ['lower-arm', d.lower_arm, 2],
         ['wrist', d.wrist, 3],
         ['wrist-twist', d.wrist_twist, 1],
-        ['coupling', d.coupling, 3],
       ];
       tB.forEach(([k, v, m]) => { setText('sc-' + k, v ?? '--'); setBar('bar-' + k, v || 0, m); });
 
@@ -417,13 +409,13 @@
       }
       rebaHistChart.update('none');
 
-      // Per-body-part mini charts
-      push(cTrunk, +(a.trunk || 0));
-      push(cNeck, +(a.neck || 0));
-      push(cArm, +(a.upper_arm_left || 0));
-      push(cKnee, +(a.knee_left || a.knee || 0));
-      push(cForearm, +(a.lower_arm_left || a.forearm || 0));
-      push(cWrist, +(a.wrist_left || a.wrist || 0));
+      // Per-body-part mini charts — keys match skeleton.py output
+      push(cTrunk,   Math.abs(+(a.trunk || 0)));
+      push(cNeck,    Math.abs(+(a.neck  || 0)));
+      push(cArm,     +(a.upper_arm_left || 0));
+      push(cKnee,    +(a.knee_left  || 0));
+      push(cForearm, +(a.elbow_left || 0));
+      push(cWrist,   Math.abs(+(a.wrist_left || 0)));
     });
 
     function updateChartsTheme(isLight) {

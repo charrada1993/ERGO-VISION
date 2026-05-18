@@ -158,6 +158,49 @@ const scoreChart = new Chart(scoreCtx, {
 // (driven by same data as angleChart — no extra canvases needed)
 
 // ══════════════════════════════════════════════════════════
+//  JOINT ANGLE TRENDS (12 individual charts)
+// ══════════════════════════════════════════════════════════
+const TREND_DEFS = [
+  { id: 'trend-neck', max: 180, min: -180, lines: [{key: 'neck', color: '#00d4ff'}, {key: 'neck_roll', color: '#ffb84d'}, {key: 'neck_yaw', color: '#ff4d6d'}] },
+  { id: 'trend-trunk', max: 180, min: -180, lines: [{key: 'trunk', color: '#00d4ff'}, {key: 'trunk_roll', color: '#ffb84d'}, {key: 'trunk_yaw', color: '#ff4d6d'}] },
+  { id: 'trend-rshl', max: 180, min: -180, lines: [{key: 'upper_arm_right', color: '#00d4ff'}, {key: 'abd_r', color: '#00ffaa'}] },
+  { id: 'trend-lshl', max: 180, min: -180, lines: [{key: 'upper_arm_left', color: '#00d4ff'}, {key: 'abd_l', color: '#00ffaa'}] },
+  { id: 'trend-relb', max: 180, min: -180, lines: [{key: 'elbow_right', color: '#00d4ff'}, {key: 'elb_roll_r', color: '#ffb84d'}] },
+  { id: 'trend-lelb', max: 180, min: -180, lines: [{key: 'elbow_left', color: '#00d4ff'}, {key: 'elb_roll_l', color: '#ffb84d'}] },
+  { id: 'trend-rwri', max: 180, min: -180, lines: [{key: 'wrist_right', color: '#00d4ff'}, {key: 'wri_roll_r', color: '#ffb84d'}, {key: 'wri_yaw_r', color: '#ff4d6d'}] },
+  { id: 'trend-lwri', max: 180, min: -180, lines: [{key: 'wrist_left', color: '#00d4ff'}, {key: 'wri_roll_l', color: '#ffb84d'}, {key: 'wri_yaw_l', color: '#ff4d6d'}] },
+  { id: 'trend-rthi', max: 180, min: -180, lines: [{key: 'hip_right', color: '#00d4ff'}, {key: 'thi_roll_r', color: '#ffb84d'}, {key: 'thi_yaw_r', color: '#ff4d6d'}] },
+  { id: 'trend-lthi', max: 180, min: -180, lines: [{key: 'hip_left', color: '#00d4ff'}, {key: 'thi_roll_l', color: '#ffb84d'}, {key: 'thi_yaw_l', color: '#ff4d6d'}] },
+  { id: 'trend-rkne', max: 180, min: -180, lines: [{key: 'knee_right', color: '#00d4ff'}] },
+  { id: 'trend-lkne', max: 180, min: -180, lines: [{key: 'knee_left', color: '#00d4ff'}] },
+];
+
+const trendCharts = {};
+TREND_DEFS.forEach(def => {
+  const el = document.getElementById(def.id);
+  if (!el) return;
+  const ctx = el.getContext('2d');
+  trendCharts[def.id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: def.lines.map(l => ds(l.key, l.color, false))
+    },
+    options: {
+      ...baseLineOptions('Degrees', def.max),
+      scales: {
+        x: { display: false },
+        y: {
+          min: def.min, max: def.max,
+          ticks: { stepSize: 90, color: '#6b7a99', font: { size: 10 } },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          title: { display: true, text: 'Degrees', color: '#6b7a99', font: { size: 9 } }
+        }
+      }
+    }
+  });
+});
+// ══════════════════════════════════════════════════════════
 //  Tab switching
 // ══════════════════════════════════════════════════════════
 const chartPanels = {
@@ -208,6 +251,20 @@ setInterval(() => {
 }, 1000);
 
 // ══════════════════════════════════════════════════════════
+//  Frontend smoothing state (mirrors backend EMA at 0.20)
+// ══════════════════════════════════════════════════════════
+let _fNeck = null, _fTrunk = null, _fArmL = null, _fArmR = null,
+    _fFrm  = null, _fWrist = null;
+const F_ALPHA = 0.25;   // frontend lerp weight (slightly higher than backend)
+function lerp(prev, next) {
+  if (prev === null) return next;
+  return F_ALPHA * next + (1 - F_ALPHA) * prev;
+}
+
+// Last known-good RULA/REBA (prevents '--' on holdout frames)
+let _lastRula = '--', _lastReba = '--';
+
+// ══════════════════════════════════════════════════════════
 //  Socket.IO — pose_update
 // ══════════════════════════════════════════════════════════
 socket.on('pose_update', (data) => {
@@ -219,12 +276,20 @@ socket.on('pose_update', (data) => {
   const ts = makeTimestamp();
 
   // ── 1. Metric cards ──
-  const neck  = +(a.neck          || 0).toFixed(1);
-  const trunk = +(a.trunk         || 0).toFixed(1);
-  const armL  = +(a.upper_arm_left|| 0).toFixed(1);
-  const armR  = +(a.upper_arm_right||0).toFixed(1);
-  const frm   = +(a.lower_arm_left || a.forearm || 0).toFixed(1);
-  const wrist = +(a.wrist_left    || a.wrist || 0).toFixed(1);
+  // Keys match skeleton.py output.  Frontend lerp smooths micro-jitter.
+  _fNeck  = lerp(_fNeck,  +(a.neck           || 0));
+  _fTrunk = lerp(_fTrunk, +(a.trunk          || 0));
+  _fArmL  = lerp(_fArmL,  +(a.upper_arm_left || 0));
+  _fArmR  = lerp(_fArmR,  +(a.upper_arm_right|| 0));
+  _fFrm   = lerp(_fFrm,   +(a.elbow_left     || 0));
+  _fWrist = lerp(_fWrist, +(a.wrist_left     || 0));
+
+  const neck  = +_fNeck.toFixed(1);
+  const trunk = +_fTrunk.toFixed(1);
+  const armL  = +_fArmL.toFixed(1);
+  const armR  = +_fArmR.toFixed(1);
+  const frm   = +_fFrm.toFixed(1);
+  const wrist = +_fWrist.toFixed(1);
 
   // AI model override/augmentation
   const aiPanel = document.getElementById('aiPanel');
@@ -232,8 +297,11 @@ socket.on('pose_update', (data) => {
   const aiRebaEl = document.getElementById('aiReba');
   const aiFeedEl = document.getElementById('aiPredictionFeed');
   
-  let rulaScore = data.rula ?? '--';
-  let rebaScore = data.reba ?? '--';
+  let rulaScore = (data.rula != null) ? data.rula : _lastRula;
+  let rebaScore = (data.reba != null) ? data.reba : _lastReba;
+  // Only update last-known-good when the server has a real score
+  if (data.rula != null) _lastRula = data.rula;
+  if (data.reba != null) _lastReba = data.reba;
   let isAI = false;
 
   if (data.ai_results) {
@@ -251,7 +319,27 @@ socket.on('pose_update', (data) => {
     
     if (data.ai_results.condition_code !== undefined) {
       if (condBox) condBox.style.display = 'block';
-      const conditions = ["Normal", "Tendinitis", "Back Pain", "Cervicalgia", "Bursitis", "Strain", "Carpal Tunnel"];
+      // Matches dataset condition_code 0–17 (condition_code → main_condition)
+      const conditions = [
+        "Carpal Tunnel",          // 0
+        "Cervical Disc Risk",     // 1
+        "Cervicalgia",            // 2
+        "De Quervain",            // 3
+        "Elbow Epicondylitis",    // 4
+        "Elbow Strain",           // 5
+        "Frozen Shoulder",        // 6
+        "Hip Bursitis",           // 7
+        "Hip Flexor Strain",      // 8
+        "Low Back Pain",          // 9
+        "Lumbar Disc Risk",       // 10
+        "Normal",                 // 11
+        "Postural Kyphosis",      // 12
+        "Rotator Cuff Tendinitis",// 13
+        "Shoulder Bursitis",      // 14
+        "Shoulder Impingement",   // 15
+        "Tech Neck",              // 16
+        "Wrist Tendinitis",       // 17
+      ];
       const severities = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"];
       const cIdx = Math.min(Math.max(Math.round(data.ai_results.condition_code || 0), 0), conditions.length - 1);
       const sIdx = Math.min(Math.max(Math.round(data.ai_results.severity_code  || 0), 0), severities.length - 1);
@@ -308,20 +396,46 @@ socket.on('pose_update', (data) => {
   setJR('jr-wrist',   wrist);
 
   // ── 3. Body risk dots ──
+  // Neck: warn>15°, danger>30° (flexion = positive)
   setJointRisk('jd-neck',   neck,  15, 30);
+  // Trunk: warn>20°, danger>60°
   setJointRisk('jd-trunk',  trunk, 20, 60);
+  // Shoulder elevation: warn>45°, danger>90°
   setJointRisk('jd-shl',    armL,  45, 90);
   setJointRisk('jd-shr',    armR,  45, 90);
-  setJointRisk('jd-ell',    frm,   60, 100);
-  setJointRisk('jd-elr',    frm,   60, 100);
-  setJointRisk('jd-wrl',    wrist, 15, 30);
-  setJointRisk('jd-wrr',    wrist, 15, 30);
+  // Elbow: interior angle 60-100° is safe (score 1)
+  // danger = outside that range. Use deviation from ideal 80° midpoint.
+  const elbowDevL = Math.abs(frm - 80);
+  setJointRisk('jd-ell',    elbowDevL, 20, 60);
+  setJointRisk('jd-elr',    elbowDevL, 20, 60);
+  // Wrist: signed angle — use absolute value
+  setJointRisk('jd-wrl',    Math.abs(wrist), 15, 30);
+  setJointRisk('jd-wrr',    Math.abs(wrist), 15, 30);
+  // Knee
+  const kneeL = +(a.knee_left  || 0).toFixed(1);
+  const kneeR = +(a.knee_right || 0).toFixed(1);
+  setJointRisk('jd-knl',    kneeL, 30, 60);
+  setJointRisk('jd-knr',    kneeR, 30, 60);
+  setJointRisk('jd-hip',    0,      0,  0);  // hip: always ok (no score defined)
 
   // ── 4. Angle chart (6 body-part lines) ──
-  pushRolling(angleChart, ts, neck, trunk, armL, armR, frm, wrist);
+  // Use absolute for wrist/neck (signed) so chart range stays 0-180°
+  pushRolling(angleChart, ts, Math.abs(neck), Math.abs(trunk), armL, armR, frm, Math.abs(wrist));
 
   // ── 5. RULA/REBA chart ──
   pushRolling(scoreChart, ts, +(data.rula || 0), +(data.reba || 0));
+
+  // ── 6. Update Trend Charts ──
+  const tA = data.angles || {};
+  TREND_DEFS.forEach(def => {
+    const chart = trendCharts[def.id];
+    if (!chart) return;
+    const vals = def.lines.map(l => {
+        let v = tA[l.key];
+        return (v !== undefined && v !== null) ? v : 0;
+    });
+    pushRolling(chart, ts, ...vals);
+  });
 
 
   // ── 7. Anomaly feed ──
@@ -374,8 +488,18 @@ function setBar(id, val, max) {
 function setJR(id, angle) {
   const el = document.getElementById(id);
   if (!el) return;
-  // Replace only text node (keep the <span class="jr-unit"> child)
-  el.childNodes[0].textContent = isNaN(angle) ? '--' : angle.toFixed(1);
+  const disp = isNaN(angle) ? '--' : angle.toFixed(1);
+  // Find the text node before the <span class="jr-unit"> or just set textContent
+  let textNode = null;
+  for (const n of el.childNodes) {
+    if (n.nodeType === Node.TEXT_NODE) { textNode = n; break; }
+  }
+  if (textNode) {
+    textNode.textContent = disp;
+  } else {
+    // Fallback: prepend a text node
+    el.insertBefore(document.createTextNode(disp), el.firstChild);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -397,7 +521,7 @@ function updateChartsTheme(isLight) {
   const gridCol = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)';
   const tickCol = isLight ? '#5d6d7e' : '#6b7a99';
   
-  const allCharts = [angleChart, scoreChart];
+  const allCharts = [angleChart, scoreChart, ...Object.values(trendCharts)];
   allCharts.forEach(c => {
     if (!c) return;
     Object.values(c.options.scales).forEach(s => {

@@ -337,6 +337,135 @@
       </div><!-- /col-side -->
     </div><!-- /dash-grid -->
 
+    <!-- ── Joint Angle Trends ── -->
+    <div class="card trends-panel" style="margin-top: 1.5rem; border: 1px solid var(--border); background: var(--panel-bg);">
+      <div class="panel-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;">
+        <div class="panel-title" style="text-transform: uppercase; letter-spacing: 2px; font-size: 0.95rem; color: var(--text-muted); font-weight: 700;">JOINT ANGLE TRENDS</div>
+      </div>
+      <div class="trends-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem;">
+        <!-- Neck -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">NECK</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― Neck</span> <span style="color:#ffb84d;">― Neck Roll</span> <span style="color:#ff4d6d;">― Neck Yaw</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-neck"></canvas>
+          </div>
+        </div>
+        <!-- Trunk -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">BACK / TRUNK</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― Trunk Pitch</span> <span style="color:#ffb84d;">― Trunk Roll</span> <span style="color:#ff4d6d;">― Trunk Yaw</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-trunk"></canvas>
+          </div>
+        </div>
+        <!-- Right Shoulder -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT SHOULDER</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― R Shoulder</span> <span style="color:#00ffaa;">― R Shoulder Abduction</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-rshl"></canvas>
+          </div>
+        </div>
+        <!-- Left Shoulder -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT SHOULDER</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― L Shoulder</span> <span style="color:#00ffaa;">― L Shoulder Abduction</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-lshl"></canvas>
+          </div>
+        </div>
+        <!-- Right Elbow -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT ELBOW</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― R Elbow</span> <span style="color:#ffb84d;">― R Elbow Roll</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-relb"></canvas>
+          </div>
+        </div>
+        <!-- Left Elbow -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT ELBOW</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― L Elbow</span> <span style="color:#ffb84d;">― L Elbow Roll</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-lelb"></canvas>
+          </div>
+        </div>
+        <!-- Right Wrist -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT WRIST</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― R Wrist</span> <span style="color:#ffb84d;">― R Wrist Roll</span> <span style="color:#ff4d6d;">― R Wrist Yaw</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-rwri"></canvas>
+          </div>
+        </div>
+        <!-- Left Wrist -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT WRIST</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― L Wrist</span> <span style="color:#ffb84d;">― L Wrist Roll</span> <span style="color:#ff4d6d;">― L Wrist Yaw</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-lwri"></canvas>
+          </div>
+        </div>
+        <!-- Right Thigh -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT THIGH</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― R Thigh</span> <span style="color:#ffb84d;">― R Thigh Roll</span> <span style="color:#ff4d6d;">― R Thigh Yaw</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-rthi"></canvas>
+          </div>
+        </div>
+        <!-- Left Thigh -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT THIGH</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― L Thigh</span> <span style="color:#ffb84d;">― L Thigh Roll</span> <span style="color:#ff4d6d;">― L Thigh Yaw</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-lthi"></canvas>
+          </div>
+        </div>
+        <!-- Right Knee -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT KNEE</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― R Knee</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-rkne"></canvas>
+          </div>
+        </div>
+        <!-- Left Knee -->
+        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT KNEE</div>
+          <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
+            <span style="color:#00d4ff;">― L Knee</span>
+          </div>
+          <div class="tc-chart" style="height: 140px; position: relative;">
+            <canvas id="trend-lkne"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Status bar -->
     <div class="status-bar">
       <div class="status-chip"><span class="dot" id="camDot"></span><i class="fas fa-camera"

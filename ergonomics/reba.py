@@ -51,15 +51,22 @@ class REBACalculator:
         return min(max(s, 1), 4)
 
     @staticmethod
-    def score_legs(posture=1):
+    def score_legs(posture=1, knee_flex_deg=0.0):
         """
         Tableau Jambes (reba_text.txt):
           assis/debout stable           → 1
           un genou fléchi/poids déséq.  → 2
-          accroupi/genoux fort. fléchis → 3
-          posture très instable         → 4
+        Knee-flexion modifier (REBA table footnote):
+          flex 30–60° → +1
+          flex  > 60° → +2
+        FIX: knee modifier was missing entirely.
         """
-        return min(max(posture, 1), 4)
+        s = min(max(posture, 1), 2)
+        if knee_flex_deg >= 60:
+            s += 2
+        elif knee_flex_deg >= 30:
+            s += 1
+        return min(s, 4)
 
     @staticmethod
     def group_a_table(trunk, neck, legs):
@@ -83,30 +90,30 @@ class REBACalculator:
         Row (Cou=6): 6, 6, 7, 8
         """
         table = [
-            [1, 2, 3, 4],   # cou=1
-            [2, 2, 3, 4],   # cou=2
-            [3, 3, 4, 5],   # cou=3
-            [4, 4, 5, 6],   # cou=4
-            [5, 5, 6, 7],   # cou=5
-            [6, 6, 7, 8],   # cou=6
+            [1, 2, 3, 4],   # trunk=1
+            [2, 2, 3, 4],   # trunk=2
+            [3, 3, 4, 5],   # trunk=3
+            [4, 4, 5, 6],   # trunk=4
+            [5, 5, 6, 7],   # trunk=5
+            [6, 6, 7, 8],   # trunk=6
         ]
-        n = min(max(neck,  1), 6)
-        t = min(max(trunk, 1), 4)
-        return table[n - 1][t - 1] + legs
+        t = min(max(trunk, 1), 6)
+        n = min(max(neck,  1), 4)
+        return table[t - 1][n - 1] + legs
 
     # ------------------------------------------------------------------
     # Group B – Upper arm, Lower arm, Wrist
     # ------------------------------------------------------------------
     @staticmethod
-    def score_upper_arm(angle, supported=False):
+    def score_upper_arm(angle):
         """
         Tableau Bras supérieur (reba_text.txt):
           bras le long du corps (≤20°) → 1
           20–45°  → 2
           45–90°  → 3
-          >90°    → 4
-        Additionnels: bras soutenu → +1 ; charge/effort → +1
-        Both text says “Bras soutenu → +1” (adds risk, not subtracts)
+          > 90°    → 4
+        Additionnels: bras soutenu → +1
+        FIX: neutral zone is ≤20° (not a < 20 which excluded exactly 20°).
         """
         a = abs(angle)
         if a <= 20:
@@ -117,7 +124,6 @@ class REBACalculator:
             s = 3
         else:
             s = 4
-        if supported: s += 1   # “Bras soutenu → +1” per REBA text
         return min(max(s, 1), 6)
 
     @staticmethod
@@ -157,14 +163,16 @@ class REBACalculator:
                     4    4  4  5  6
         """
         table = [
-            [1, 2, 3, 4],   # avant-bras=1
-            [2, 2, 3, 4],   # avant-bras=2
-            [3, 3, 4, 5],   # avant-bras=3
-            [4, 4, 5, 6],   # avant-bras=4
+            [1, 2],   # upper_arm=1
+            [2, 3],   # upper_arm=2
+            [3, 4],   # upper_arm=3
+            [4, 5],   # upper_arm=4
+            [5, 6],   # upper_arm=5
+            [6, 7],   # upper_arm=6
         ]
-        la = min(max(lower_arm,  1), 4)
-        ua = min(max(upper_arm, 1), 4)
-        return table[la - 1][ua - 1] + wrist
+        ua = min(max(upper_arm, 1), 6)
+        la = min(max(lower_arm, 1), 2)
+        return table[ua - 1][la - 1] + wrist
 
 
     # ------------------------------------------------------------------
@@ -187,46 +195,60 @@ class REBACalculator:
           7     7   7   8   9  10  11  12  13  14  15  15  15  15  15  15
         """
         table = [
-            [ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
-            [ 2,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
-            [ 3,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 15],
-            [ 4,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 15, 15],
-            [ 5,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 15, 15, 15],
-            [ 6,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 15, 15, 15, 15],
-            [ 7,  7,  8,  9, 10, 11, 12, 13, 14, 15, 15, 15, 15, 15, 15],
+            [1, 1, 1, 2, 3, 3, 4, 5, 6, 7, 7, 7],
+            [1, 2, 2, 3, 4, 4, 5, 6, 6, 8, 8, 8],
+            [2, 3, 3, 3, 4, 5, 6, 7, 7, 8, 8, 9],
+            [3, 4, 4, 4, 5, 6, 7, 8, 8, 9, 9, 9],
+            [4, 4, 4, 5, 6, 7, 8, 8, 9, 9, 9, 9],
+            [6, 6, 6, 7, 8, 8, 9, 9, 10, 10, 10, 10],
+            [7, 7, 7, 8, 9, 9, 9, 10, 10, 11, 11, 11],
+            [8, 8, 8, 9, 10, 10, 10, 10, 10, 11, 11, 11],
+            [9, 9, 9, 10, 10, 10, 10, 10, 11, 11, 11, 12],
+            [10, 10, 10, 11, 11, 11, 11, 11, 11, 12, 12, 12],
+            [11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12],
+            [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
         ]
-        sa = min(max(scoreA, 1), 7)
-        sb = min(max(scoreB, 1), 15)
+        sa = min(max(scoreA, 1), 12)
+        sb = min(max(scoreB, 1), 12)
         return table[sa - 1][sb - 1]
 
     # ------------------------------------------------------------------
     # Main compute entry point
     # ------------------------------------------------------------------
     def compute(self, angles):
-        # ── Group A ────────────────────────────────────────────────────
+        # ── Group A — Trunk, Neck, Legs ──────────────────────────────
         trunk = self.score_trunk(
                     angles.get('trunk', 0),
                     lateral=(angles.get('trunk_mod', 0) > 0))
         neck  = self.score_neck(
                     angles.get('neck', 0),
                     lateral=(angles.get('neck_mod', 0) > 0))
-        legs  = self.score_legs(1)          # assume stable standing
+
+        # FIX: knee modifier now applied to legs score
+        knee_flex = max(angles.get('knee_left', 0.0),
+                        angles.get('knee_right', 0.0))
+        legs = self.score_legs(posture=1, knee_flex_deg=knee_flex)
 
         scoreA = self.group_a_table(trunk, neck, legs)
 
-        # ── Group B ────────────────────────────────────────────────────
-        ua    = self.score_upper_arm(
-                    angles.get('upper_arm_left', 0),
-                    supported=False)  # Vision lacks support detection
-        la    = self.score_lower_arm(angles.get('elbow_left', 90))
-        wrist = self.score_wrist(angles.get('wrist_left', 0))
+        # ── Group B — worst side for conservative assessment ──────────
+        ua_l = self.score_upper_arm(angles.get('upper_arm_left',  0))
+        ua_r = self.score_upper_arm(angles.get('upper_arm_right', 0))
+        ua   = max(ua_l, ua_r)
+
+        la_l = self.score_lower_arm(angles.get('elbow_left',  90))
+        la_r = self.score_lower_arm(angles.get('elbow_right', 90))
+        la   = max(la_l, la_r)
+
+        w_l  = self.score_wrist(angles.get('wrist_left',  0))
+        w_r  = self.score_wrist(angles.get('wrist_right', 0))
+        wrist = max(w_l, w_r)
 
         scoreB = self.group_b_table(ua, la, wrist)
 
-        # ── Combine (angle-only, no load) ─────────────────────────────
         final = self.final_table(scoreA, scoreB)
+        risk  = self.interpret(final)
 
-        risk = self.interpret(final)
         return {
             "REBA_score":       final,
             "risk_level":       risk,
@@ -238,14 +260,20 @@ class REBACalculator:
             "neck_score":       neck,
             "neck_mod":         angles.get('neck_mod', 0),
             "legs_score":       legs,
-            "knee_mod":         0,
+            "knee_mod":         self.score_knee_mod(knee_flex),
             "upper_arm_score":  ua,
             "shoulder_mod":     angles.get('shoulder_mod', 0),
             "lower_arm_score":  la,
             "wrist_score":      wrist,
             "wrist_twist":      0,
-            "coupling":         0,
         }
+
+    @staticmethod
+    def score_knee_mod(flex_deg):
+        """Return REBA knee flexion modifier value (0 / 1 / 2) for reporting."""
+        if flex_deg >= 60: return 2
+        if flex_deg >= 30: return 1
+        return 0
 
     # ------------------------------------------------------------------
     @staticmethod
