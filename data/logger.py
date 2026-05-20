@@ -6,6 +6,20 @@ from datetime import datetime
 from config import Config
 
 class DataLogger:
+    CONDITIONS = [
+        "Normal",
+        "Carpal Tunnel", "Cervical Disc Risk", "Cervicalgia", "De Quervain",
+        "Elbow Epicondylitis", "Elbow Strain", "Frozen Shoulder", "Hip Bursitis",
+        "Hip Flexor Strain", "Low Back Pain", "Lumbar Disc Risk",
+        "Postural Kyphosis", "Rotator Cuff Tendinitis", "Shoulder Bursitis",
+        "Shoulder Impingement", "Tech Neck", "Wrist Tendinitis"
+    ]
+    SEVERITIES = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"]
+    LOCATIONS = [
+        "None", "Wrist", "Elbow", "Shoulder", "Neck", "Upper Back",
+        "Lower Back", "Hip", "Knee", "Full Body"
+    ]
+
     def __init__(self):
         self.file = None
         self.writer = None
@@ -29,7 +43,9 @@ class DataLogger:
             "wr_left_deg", "wr_right_deg",
             "RULA_score", "REBA_score",
             "risk_prediction", "anomalies",
-            "ai_risk_score", "ai_severity", "ai_location", "ai_condition"
+            "ai_risk_score", "ai_severity_code", "ai_severity",
+            "ai_location_code", "ai_location", 
+            "ai_condition_code", "ai_condition"
         ])
         self.start_time = time.time()
         self.sample_count = 0
@@ -43,6 +59,14 @@ class DataLogger:
         
         # Extract AI results if available
         ai_res = ai_results if ai_results else {}
+        
+        sev_code = int(ai_res.get('severity_code', 0))
+        loc_code = int(ai_res.get('location_code', 0))
+        cond_code = int(ai_res.get('condition_code', 0))
+        
+        sev_str = self.SEVERITIES[sev_code] if 0 <= sev_code < len(self.SEVERITIES) else "Unknown"
+        loc_str = self.LOCATIONS[loc_code] if 0 <= loc_code < len(self.LOCATIONS) else "Unknown"
+        cond_str = self.CONDITIONS[cond_code] if 0 <= cond_code < len(self.CONDITIONS) else "Unknown"
         
         row = [
             round(elapsed, 3),
@@ -60,9 +84,9 @@ class DataLogger:
             rula_result.get('risk_level', 'Low'),
             "; ".join(anomalies) if anomalies else "None",
             round(ai_res.get('risk_score', 0.0), 2),
-            ai_res.get('severity_code', 0),
-            ai_res.get('location_code', 0),
-            ai_res.get('condition_code', 0)
+            sev_code, sev_str,
+            loc_code, loc_str,
+            cond_code, cond_str
         ]
         self.writer.writerow(row)
         self.file.flush()

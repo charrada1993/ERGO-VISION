@@ -147,22 +147,27 @@
     </div>
 
     <!-- ── Live Camera & Final Score ── -->
-    <div class="assessment-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-bottom: 1.25rem;">
+    <div class="assessment-grid"
+      style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-bottom: 1.25rem;">
       <!-- RGB video feed -->
       <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
         <div class="panel-header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
           <div class="panel-title"><i class="fas fa-video" style="color:var(--cyan)"></i> Live Assessment View</div>
           <div style="display:flex;gap:0.6rem;align-items:center">
-             <span style="font-size: 0.7rem; color: var(--green);">●</span><span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">RGB</span>
+            <span style="font-size: 0.7rem; color: var(--green);">●</span><span
+              style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">RGB</span>
           </div>
         </div>
-        <div style="position: relative; width: 100%; background: #000; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 240px;">
-          <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed" style="width: 100%; height: 100%; object-fit: cover;">
+        <div
+          style="position: relative; width: 100%; background: #000; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 240px;">
+          <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed"
+            style="width: 100%; height: 100%; object-fit: cover;">
         </div>
       </div>
 
       <!-- Final score card -->
-      <div class="card final-score-card" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+      <div class="card final-score-card"
+        style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
         <div class="final-score-num" id="rulaFinalBig">--</div>
         <div class="final-score-label">RULA Final Score</div>
         <div style="margin-top:0.75rem"><span class="risk-chip" id="rulaActionChip">Waiting for data…</span></div>
@@ -184,35 +189,6 @@
       </div>
       <canvas id="rulaChart" height="80"></canvas>
     </div>
-
-    <!-- ── Per-joint angle mini charts ── -->
-    <div class="assessment-grid">
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span class="pt-icon" style="color:var(--col-arm-l)">●</span> Upper Arm Angle</div>
-        </div>
-        <canvas id="chartArmAngle" height="80"></canvas>
-      </div>
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span class="pt-icon" style="color:var(--col-neck)">●</span> Neck Angle</div>
-        </div>
-        <canvas id="chartNeckAngle" height="80"></canvas>
-      </div>
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span class="pt-icon" style="color:var(--col-forearm)">●</span> Forearm Angle</div>
-        </div>
-        <canvas id="chartForearmAngle" height="80"></canvas>
-      </div>
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span class="pt-icon" style="color:var(--col-wrist)">●</span> Wrist Angle</div>
-        </div>
-        <canvas id="chartWristAngle" height="80"></canvas>
-      </div>
-    </div>
-
   </main>
 
   <script>
@@ -275,11 +251,7 @@
       }
     });
 
-    // Joint mini charts
-    const cArm = mkChart('chartArmAngle', '#00e5a0', 'Upper Arm °');
-    const cNeck = mkChart('chartNeckAngle', '#ff4d6d', 'Neck °');
-    const cForearm = mkChart('chartForearmAngle', '#ffc94d', 'Forearm °');
-    const cWrist = mkChart('chartWristAngle', '#ff7c3e', 'Wrist °');
+
 
     const ACTIONS = [
       '',
@@ -355,18 +327,12 @@
       }
       rulaHistChart.update('none');
 
-      // Joint mini charts — use correct angle keys
-      push(cArm, +(a.upper_arm_left || 0));
-      push(cNeck, Math.abs(+(a.neck || 0)));
-      push(cForearm, +(a.elbow_left || 0));
-      push(cWrist, Math.abs(+(a.wrist_left || 0)));
     });
 
     function updateChartsTheme(isLight) {
       const gridCol = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)';
       const tickCol = isLight ? '#5d6d7e' : '#6b7a99';
-      const allCharts = [rulaHistChart, cArm, cNeck, cForearm, cWrist];
-      allCharts.forEach(c => {
+      [rulaHistChart].forEach(c => {
         if (!c) return;
         Object.values(c.options.scales).forEach(s => {
           if (s.grid) s.grid.color = gridCol;

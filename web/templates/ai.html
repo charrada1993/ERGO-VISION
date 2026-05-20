@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,129 +9,310 @@
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap"
+    rel="stylesheet">
   <style>
     /* ── AI Page Variables ── */
     :root {
-      --safe:    #00ffaa; --safe-glow:    rgba(0,255,170,0.35);
-      --warning: #ffb84d; --warning-glow: rgba(255,184,77,0.35);
-      --danger:  #ff3366; --danger-glow:  rgba(255,51,102,0.35);
+      --safe: #00ffaa;
+      --safe-glow: rgba(0, 255, 170, 0.35);
+      --warning: #ffb84d;
+      --warning-glow: rgba(255, 184, 77, 0.35);
+      --danger: #ff3366;
+      --danger-glow: rgba(255, 51, 102, 0.35);
       --ai-accent: #00d4ff;
     }
 
     /* hero risk ring */
     .risk-ring-wrap {
-      position: relative; width: 220px; height: 220px; margin: 0 auto 1.5rem;
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 1.5rem;
     }
-    .risk-ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-    .ring-bg  { fill:none; stroke:rgba(255,255,255,0.04); stroke-width:14; }
+
+    .risk-ring-wrap svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.06);
+      stroke-width: 14;
+    }
+
     .ring-fill {
-      fill:none; stroke:var(--safe); stroke-width:14; stroke-linecap:round;
-      stroke-dasharray:628; stroke-dashoffset:628;
-      transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke .7s ease;
+      fill: none;
+      stroke: var(--safe);
+      stroke-width: 14;
+      stroke-linecap: round;
+      stroke-dasharray: 597;
+      stroke-dashoffset: 597;
+      transition: stroke-dashoffset 1s cubic-bezier(.4, 0, .2, 1), stroke .7s ease;
       filter: drop-shadow(0 0 10px var(--safe-glow));
     }
+
     .ring-center {
-      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-      text-align:center;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
     }
+
     .ring-score {
-      font-size:3.2rem; font-weight:800; line-height:1;
-      font-family:'JetBrains Mono',monospace; color:#fff;
+      font-size: 3.2rem;
+      font-weight: 800;
+      line-height: 1;
+      font-family: 'JetBrains Mono', monospace;
+      color: #fff;
     }
+
     .ring-label {
-      font-size:0.7rem; text-transform:uppercase; letter-spacing:3px;
-      color:var(--text-muted); margin-top:4px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+      margin-top: 4px;
     }
 
     /* diagnosis headline */
     .diag-headline {
-      font-size:2.4rem; font-weight:800; letter-spacing:-0.5px;
-      color:var(--safe); text-align:center; margin:0 0 0.4rem;
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--safe);
+      text-align: center;
+      margin: 0 0 0.4rem;
       transition: color .7s ease, text-shadow .7s ease;
       text-shadow: 0 0 30px var(--safe-glow);
-      line-height:1.1;
+      line-height: 1.1;
     }
+
     .diag-sub {
-      text-align:center; font-size:0.78rem; text-transform:uppercase;
-      letter-spacing:3px; color:var(--text-muted); margin-bottom:2rem;
+      text-align: center;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
     }
 
     /* AI metric row */
     .ai-metrics {
-      display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
     }
+
     .ai-metric {
-      background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
-      border-radius:14px; padding:1.1rem 1.2rem; text-align:center;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 14px;
+      padding: 1.1rem 1.2rem;
+      text-align: center;
       transition: border-color .3s, box-shadow .3s;
     }
-    .ai-metric:hover { border-color:rgba(0,212,255,0.25); box-shadow:0 4px 20px rgba(0,212,255,0.08); }
-    .ai-metric-label {
-      font-size:0.62rem; font-weight:700; text-transform:uppercase;
-      letter-spacing:0.1em; color:var(--text-muted); margin-bottom:0.5rem;
+
+    .ai-metric:hover {
+      border-color: rgba(0, 212, 255, 0.25);
+      box-shadow: 0 4px 20px rgba(0, 212, 255, 0.08);
     }
+
+    .ai-metric-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
     .ai-metric-val {
-      font-size:1.5rem; font-weight:800; font-family:'JetBrains Mono',monospace;
-      color:var(--ai-accent);
+      font-size: 1.5rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--ai-accent);
     }
 
     /* severity bar */
     .sev-track {
-      height:6px; background:rgba(255,255,255,0.05); border-radius:3px;
-      overflow:hidden; margin-top:0.6rem;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 0.6rem;
     }
+
     .sev-fill {
-      height:100%; border-radius:3px; background:var(--safe);
-      transition:width .8s cubic-bezier(.23,1,.32,1), background .7s ease;
+      height: 100%;
+      border-radius: 3px;
+      background: var(--safe);
+      transition: width .8s cubic-bezier(.23, 1, .32, 1), background .7s ease;
       box-shadow: 0 0 8px var(--safe-glow);
     }
 
     /* console */
     .ai-console {
-      background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.05);
-      border-radius:14px; padding:1rem 1.2rem;
-      font-family:'JetBrains Mono',monospace; font-size:0.78rem;
-      color:var(--ai-accent); height:130px; overflow:hidden; line-height:1.7;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--ai-accent);
+      height: 130px;
+      overflow: hidden;
+      line-height: 1.7;
     }
-    .console-dots { display:flex; gap:5px; margin-bottom:0.6rem; }
-    .console-dots span { width:9px;height:9px;border-radius:50%; }
-    .console-dots span:nth-child(1){background:#ff5f56;}
-    .console-dots span:nth-child(2){background:#ffbd2e;}
-    .console-dots span:nth-child(3){background:#27c93f;}
-    .con-line { opacity:0; animation:fadeIn .35s forwards; }
-    .con-ts { color:var(--text-muted); margin-right:.4rem; }
-    @keyframes fadeIn { to{opacity:1;} }
+
+    .console-dots {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 0.6rem;
+    }
+
+    .console-dots span {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .console-dots span:nth-child(1) {
+      background: #ff5f56;
+    }
+
+    .console-dots span:nth-child(2) {
+      background: #ffbd2e;
+    }
+
+    .console-dots span:nth-child(3) {
+      background: #27c93f;
+    }
+
+    .con-line {
+      opacity: 0;
+      animation: fadeIn .35s forwards;
+    }
+
+    .con-ts {
+      color: var(--text-muted);
+      margin-right: .4rem;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
 
     /* joint inputs strip */
     .joint-strip {
-      display:grid; grid-template-columns:repeat(6,1fr);
-      gap:0.6rem; margin-top:1rem;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.6rem;
+      margin-top: 1rem;
     }
+
     .joint-chip {
-      background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
-      border-radius:10px; padding:0.6rem 0.4rem; text-align:center;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 0.6rem 0.4rem;
+      text-align: center;
     }
-    .jc-label { font-size:0.55rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); }
-    .jc-val { font-size:0.9rem; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--ai-accent); margin-top:2px; }
+
+    .jc-label {
+      font-size: 0.55rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-muted);
+    }
+
+    .jc-val {
+      font-size: 0.9rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--ai-accent);
+      margin-top: 2px;
+    }
 
     /* light-mode */
-    body.light-mode { --ai-accent:#0d7377; }
-    body.light-mode .ai-metric { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.1); }
-    body.light-mode .ai-console { background:rgba(0,0,0,0.05); color:#0d7377; border-color:rgba(0,0,0,0.1); }
-    body.light-mode .con-ts { color:#5d6d7e; }
-    body.light-mode .joint-chip { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.1); }
-    body.light-mode .diag-headline { color:#0d7377; }
-    body.light-mode .ring-score { color:#1a2535; }
-    body.light-mode .ring-bg { stroke: rgba(0, 0, 0, 0.05); }
+    body.light-mode {
+      --ai-accent: #0d7377;
+      --safe: #00917a;
+      --warning: #b8762a;
+      --danger: #cc1a3a;
+    }
 
-    @media(max-width:768px){
-      .ai-metrics { grid-template-columns:1fr; }
-      .joint-strip { grid-template-columns:repeat(3,1fr); }
-      .diag-headline { font-size:1.7rem; }
+    body.light-mode .ai-metric {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    body.light-mode .ai-console {
+      background: rgba(0, 0, 0, 0.05);
+      color: #0d7377;
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    body.light-mode .con-ts {
+      color: #5d6d7e;
+    }
+
+    body.light-mode .joint-chip {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    body.light-mode .diag-headline {
+      color: #0d7377;
+    }
+
+    body.light-mode .ring-score {
+      color: #1a2535;
+    }
+
+    body.light-mode .ring-bg {
+      stroke: rgba(0, 0, 0, 0.08);
+    }
+
+    body.light-mode .ring-fill {
+      stroke: #0d7377;
+    }
+
+    body.light-mode .sev-track {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    body.light-mode .output-info {
+      background: rgba(13, 115, 119, 0.06);
+      border-color: rgba(13, 115, 119, 0.18);
+    }
+
+    body.light-mode .output-info strong {
+      color: #1a3a5c;
+    }
+
+    @media(max-width:768px) {
+      .ai-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .joint-strip {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .diag-headline {
+        font-size: 1.7rem;
+      }
     }
   </style>
 </head>
+
 <body>
 
   <!-- Navbar -->
@@ -159,7 +341,9 @@
   <main class="container">
     <div class="page-header">
       <h1 class="page-title"><i class="fas fa-brain"></i> AI Diagnostic Engine</h1>
-      <p class="page-sub">ErgoNet v2.0 &nbsp;·&nbsp; 12-input MLP &nbsp;·&nbsp; 20 000 clinical samples &nbsp;·&nbsp; 97.1% accuracy</p>
+      <p class="page-sub">ErgoNet v2.0 &nbsp;·&nbsp; 12-input MLP &nbsp;·&nbsp; 20 000 clinical samples &nbsp;·&nbsp;
+        97.1% accuracy</p>
+
     </div>
 
     <div class="dash-grid" style="grid-template-columns:340px 1fr; gap:1.5rem;">
@@ -168,14 +352,15 @@
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
         <div class="card" style="padding:2rem;text-align:center;">
-          <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:1.2rem;">
+          <div
+            style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:1.2rem;">
             <i class="fas fa-microchip" style="color:var(--cyan)"></i>&nbsp; AI Risk Index
           </div>
           <!-- Ring gauge -->
           <div class="risk-ring-wrap">
             <svg viewBox="0 0 220 220">
-              <circle class="ring-bg" cx="110" cy="110" r="95"/>
-              <circle class="ring-fill" id="riskRing" cx="110" cy="110" r="95"/>
+              <circle class="ring-bg" cx="110" cy="110" r="95" />
+              <circle class="ring-fill" id="riskRing" cx="110" cy="110" r="95" />
             </svg>
             <div class="ring-center">
               <div class="ring-score" id="riskScore">--</div>
@@ -201,7 +386,8 @@
 
         <!-- Console -->
         <div class="card" style="padding:1.2rem;">
-          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:0.75rem;">
+          <div
+            style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:0.75rem;">
             <i class="fas fa-terminal" style="color:var(--cyan)"></i>&nbsp; Inference Log
           </div>
           <div class="console-dots"><span></span><span></span><span></span></div>
@@ -219,8 +405,10 @@
         <!-- 4 AI output cards -->
         <div class="card" style="padding:1.5rem;">
           <div class="panel-header" style="margin-bottom:1.25rem;">
-            <div class="panel-title"><i class="fas fa-chart-bar" style="color:var(--cyan)"></i> AI Output Breakdown</div>
-            <span class="badge-pill" style="background:rgba(0,229,160,0.1);color:var(--green);font-size:0.65rem;" id="modelBadge">Waiting</span>
+            <div class="panel-title"><i class="fas fa-chart-bar" style="color:var(--cyan)"></i> AI Output Breakdown
+            </div>
+            <span class="badge-pill" style="background:rgba(0,229,160,0.1);color:var(--green);font-size:0.65rem;"
+              id="modelBadge">Waiting</span>
           </div>
           <div class="ai-metrics">
             <div class="ai-metric">
@@ -229,99 +417,80 @@
               <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Scale 0 – 10</div>
             </div>
             <div class="ai-metric">
-              <div class="ai-metric-label"><i class="fas fa-stethoscope" style="color:var(--purple)"></i> Condition Code</div>
+              <div class="ai-metric-label"><i class="fas fa-stethoscope" style="color:var(--purple)"></i> Condition Code
+              </div>
               <div class="ai-metric-val" id="metCondCode" style="color:var(--purple)">--</div>
               <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;" id="metCondName">–</div>
             </div>
             <div class="ai-metric">
-              <div class="ai-metric-label"><i class="fas fa-exclamation-triangle" style="color:var(--yellow)"></i> Severity</div>
+              <div class="ai-metric-label"><i class="fas fa-exclamation-triangle" style="color:var(--yellow)"></i>
+                Severity</div>
               <div class="ai-metric-val" id="metSev" style="color:var(--yellow)">--</div>
               <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;" id="metSevName">–</div>
             </div>
             <div class="ai-metric">
-              <div class="ai-metric-label"><i class="fas fa-map-marker-alt" style="color:var(--orange)"></i> Location Code</div>
+              <div class="ai-metric-label"><i class="fas fa-map-marker-alt" style="color:var(--orange)"></i> Location
+                Code</div>
               <div class="ai-metric-val" id="metLoc" style="color:var(--orange)">--</div>
               <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;" id="metLocName">–</div>
             </div>
           </div>
         </div>
 
-        <!-- Joint angle inputs (what AI sees) -->
-        <div class="card" style="padding:1.5rem;">
-          <div class="panel-title" style="margin-bottom:1rem;">
-            <i class="fas fa-person-rays" style="color:var(--cyan)"></i> Live Joint Angle Inputs
-          </div>
-          <div class="joint-strip">
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-neck)">Neck</div>
-              <div class="jc-val" id="ji-neck">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-trunk)">Trunk</div>
-              <div class="jc-val" id="ji-trunk">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-arm-l)">Shl L</div>
-              <div class="jc-val" id="ji-shl-l">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-arm-r)">Shl R</div>
-              <div class="jc-val" id="ji-shl-r">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-forearm)">Elbow L</div>
-              <div class="jc-val" id="ji-elb-l">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-forearm)">Elbow R</div>
-              <div class="jc-val" id="ji-elb-r">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-wrist)">Wrist L</div>
-              <div class="jc-val" id="ji-wri-l">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-wrist)">Wrist R</div>
-              <div class="jc-val" id="ji-wri-r">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-hip)">Hip L</div>
-              <div class="jc-val" id="ji-hip-l">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-hip)">Hip R</div>
-              <div class="jc-val" id="ji-hip-r">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-knee)">Knee L</div>
-              <div class="jc-val" id="ji-kne-l">--°</div>
-            </div>
-            <div class="joint-chip">
-              <div class="jc-label" style="color:var(--col-knee)">Knee R</div>
-              <div class="jc-val" id="ji-kne-r">--°</div>
-            </div>
-          </div>
-        </div>
+
 
         <!-- Model info strip -->
         <div class="card" style="padding:1.2rem;">
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;">
             <div style="text-align:center;">
-              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Model</div>
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Model
+              </div>
               <div style="font-size:0.88rem;font-weight:700;color:var(--cyan);margin-top:2px;">ErgoNet v2.0</div>
             </div>
             <div style="text-align:center;">
-              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Accuracy</div>
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">
+                Accuracy</div>
               <div style="font-size:0.88rem;font-weight:700;color:var(--green);margin-top:2px;">97.1%</div>
             </div>
             <div style="text-align:center;">
-              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Training</div>
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">
+                Training</div>
               <div style="font-size:0.88rem;font-weight:700;color:var(--yellow);margin-top:2px;">20 000 samples</div>
             </div>
             <div style="text-align:center;">
-              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">Conditions</div>
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);">
+                Conditions</div>
               <div style="font-size:0.88rem;font-weight:700;color:var(--purple);margin-top:2px;">18 classes</div>
             </div>
+          </div>
+        </div>
+        <div class="output-info"
+          style="max-width:760px;margin:1.25rem auto 0;padding:1rem 1.5rem;border-radius:14px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);text-align:left;">
+          <div
+            style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:0.65rem;">
+            AI Output Description</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;margin-bottom:0.85rem;">
+            <div style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.875rem;color:var(--text-muted);">
+              <span style="color:var(--cyan);font-size:0.9rem;">●</span><span><strong style="color:var(--text);">Risk
+                  Index
+                  (0–10)</strong> — Quantifies overall biomechanical strain in real-time</span></div>
+            <div style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.875rem;color:var(--text-muted);">
+              <span style="color:var(--purple);font-size:0.9rem;">●</span><span><strong
+                  style="color:var(--text);">Predicted
+                  Condition</strong> — Classifies impending Musculoskeletal Disorders (MSDs)</span></div>
+            <div style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.875rem;color:var(--text-muted);">
+              <span style="color:var(--yellow);font-size:0.9rem;">●</span><span><strong
+                  style="color:var(--text);">Severity
+                  Level</strong> — Tracks dynamic pathological risk across 5 clinical stages</span></div>
+            <div style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.875rem;color:var(--text-muted);">
+              <span style="color:var(--orange);font-size:0.9rem;">●</span><span><strong
+                  style="color:var(--text);">Anatomical
+                  Location</strong> — Pinpoints the primary stressed joint or body region</span></div>
+          </div>
+          <div
+            style="font-size:0.82rem;color:var(--text-muted);border-top:1px solid rgba(255,255,255,0.06);padding-top:0.65rem;">
+            <strong style="color:var(--text);">Why we use it:</strong> This continuous telemetry establishes a robust,
+            clinical-grade framework for immediate and targeted ergonomic intervention.
           </div>
         </div>
 
@@ -333,35 +502,36 @@
     const socket = io();
 
     const CONDITIONS = [
-      "Carpal Tunnel","Cervical Disc Risk","Cervicalgia","De Quervain",
-      "Elbow Epicondylitis","Elbow Strain","Frozen Shoulder","Hip Bursitis",
-      "Hip Flexor Strain","Low Back Pain","Lumbar Disc Risk","Normal",
-      "Postural Kyphosis","Rotator Cuff Tendinitis","Shoulder Bursitis",
-      "Shoulder Impingement","Tech Neck","Wrist Tendinitis"
+      "Normal",
+      "Carpal Tunnel", "Cervical Disc Risk", "Cervicalgia", "De Quervain",
+      "Elbow Epicondylitis", "Elbow Strain", "Frozen Shoulder", "Hip Bursitis",
+      "Hip Flexor Strain", "Low Back Pain", "Lumbar Disc Risk",
+      "Postural Kyphosis", "Rotator Cuff Tendinitis", "Shoulder Bursitis",
+      "Shoulder Impingement", "Tech Neck", "Wrist Tendinitis"
     ];
-    const SEVERITIES = ["Healthy","Low Risk","Moderate","High Risk","Critical"];
-    const LOCATIONS  = [
-      "None","Wrist","Elbow","Shoulder","Neck","Upper Back",
-      "Lower Back","Hip","Knee","Full Body"
+    const SEVERITIES = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"];
+    const LOCATIONS = [
+      "None", "Wrist", "Elbow", "Shoulder", "Neck", "Upper Back",
+      "Lower Back", "Hip", "Knee", "Full Body"
     ];
 
-    // ring circumference for r=95 → 2π×95 ≈ 597
-    const CIRC = 2 * Math.PI * 95;
+    // ring circumference for r=95 → 2π×95 ≈ 596.9 (CSS uses 597)
+    const CIRC = 2 * Math.PI * 95; // ≈ 596.9
 
-    const riskRing   = document.getElementById('riskRing');
-    const riskScore  = document.getElementById('riskScore');
-    const aiDiag     = document.getElementById('aiDiagnosis');
-    const sevChip    = document.getElementById('sevChip');
-    const sevFill    = document.getElementById('sevFill');
-    const sevLabel   = document.getElementById('sevLabel');
-    const aiConsole  = document.getElementById('aiConsole');
+    const riskRing = document.getElementById('riskRing');
+    const riskScore = document.getElementById('riskScore');
+    const aiDiag = document.getElementById('aiDiagnosis');
+    const sevChip = document.getElementById('sevChip');
+    const sevFill = document.getElementById('sevFill');
+    const sevLabel = document.getElementById('sevLabel');
+    const aiConsole = document.getElementById('aiConsole');
     const modelBadge = document.getElementById('modelBadge');
 
-    function $(id){ return document.getElementById(id); }
-    function fmt(v, dec=1){ return v != null ? (+v).toFixed(dec) : '--'; }
+    function $(id) { return document.getElementById(id); }
+    function fmt(v, dec = 1) { return v != null ? (+v).toFixed(dec) : '--'; }
 
     function addLog(msg) {
-      const t = new Date().toLocaleTimeString('en-US',{hour12:false});
+      const t = new Date().toLocaleTimeString('en-US', { hour12: false });
       const d = document.createElement('div');
       d.className = 'con-line';
       d.innerHTML = `<span class="con-ts">[${t}]</span> ${msg}`;
@@ -371,28 +541,30 @@
 
     function applyRiskTheme(risk, diag) {
       let color, glow, chipCls;
-      if (risk > 6 || (diag !== 'Normal' && diag !== 'Awaiting...')) {
-        color='var(--danger)'; glow='rgba(255,51,102,0.35)'; chipCls='high';
+      if (risk > 7.5) {
+        color = 'var(--danger)'; glow = 'rgba(255,51,102,0.35)'; chipCls = 'critical';
+      } else if (risk > 5.5 || (diag !== 'Normal' && diag !== 'Awaiting...' && risk > 4)) {
+        color = 'var(--danger)'; glow = 'rgba(255,51,102,0.35)'; chipCls = 'high';
       } else if (risk > 3) {
-        color='var(--warning)'; glow='rgba(255,184,77,0.35)'; chipCls='medium';
+        color = 'var(--warning)'; glow = 'rgba(255,184,77,0.35)'; chipCls = 'medium';
       } else {
-        color='var(--safe)'; glow='rgba(0,255,170,0.35)'; chipCls='low';
+        color = 'var(--safe)'; glow = 'rgba(0,255,170,0.35)'; chipCls = 'low';
       }
       aiDiag.style.color = color;
       aiDiag.style.textShadow = `0 0 28px ${glow}`;
       riskRing.style.stroke = color;
       riskRing.style.filter = `drop-shadow(0 0 10px ${glow})`;
       sevFill.style.background = color;
-      sevFill.style.boxShadow  = `0 0 8px ${glow}`;
+      sevFill.style.boxShadow = `0 0 8px ${glow}`;
       return chipCls;
     }
 
     socket.on('pose_update', (data) => {
-      const a  = data.angles || {};
+      const a = data.angles || {};
       const ai = data.ai_results;
 
       // Joint inputs
-      $('ji-neck').textContent  = fmt(a.neck) + '°';
+      $('ji-neck').textContent = fmt(a.neck) + '°';
       $('ji-trunk').textContent = fmt(a.trunk) + '°';
       $('ji-shl-l').textContent = fmt(a.upper_arm_left) + '°';
       $('ji-shl-r').textContent = fmt(a.upper_arm_right) + '°';
@@ -410,27 +582,27 @@
       // Risk score
       const risk = Math.max(0, Math.min(10, ai.risk_score || 0));
       riskScore.textContent = risk.toFixed(1);
-      riskRing.style.strokeDashoffset = CIRC - (risk / 10) * CIRC;
+      riskRing.style.strokeDashoffset = CIRC * (1 - risk / 10);
       $('metRisk').textContent = risk.toFixed(2);
 
       // Condition
-      const cIdx = Math.min(Math.max(Math.round(ai.condition_code || 0), 0), CONDITIONS.length-1);
+      const cIdx = Math.min(Math.max(Math.round(ai.condition_code || 0), 0), CONDITIONS.length - 1);
       const diag = CONDITIONS[cIdx];
       aiDiag.textContent = diag;
       $('metCondCode').textContent = cIdx;
       $('metCondName').textContent = diag;
 
       // Severity
-      const sIdx = Math.min(Math.max(Math.round(ai.severity_code || 0), 0), SEVERITIES.length-1);
+      const sIdx = Math.min(Math.max(Math.round(ai.severity_code || 0), 0), SEVERITIES.length - 1);
       const sevName = SEVERITIES[sIdx];
       sevLabel.textContent = sevName;
       $('metSev').textContent = sIdx;
       $('metSevName').textContent = sevName;
-      sevFill.style.width = ((sIdx / (SEVERITIES.length-1)) * 100) + '%';
+      sevFill.style.width = ((sIdx / (SEVERITIES.length - 1)) * 100) + '%';
       sevChip.textContent = sevName;
 
       // Location
-      const lIdx = Math.min(Math.max(Math.round(ai.location_code || 0), 0), LOCATIONS.length-1);
+      const lIdx = Math.min(Math.max(Math.round(ai.location_code || 0), 0), LOCATIONS.length - 1);
       $('metLoc').textContent = lIdx;
       $('metLocName').textContent = LOCATIONS[lIdx] || '--';
 
@@ -460,4 +632,5 @@
     applyTheme(localStorage.getItem('ergo-theme') === 'light');
   </script>
 </body>
+
 </html>

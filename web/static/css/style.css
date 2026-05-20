@@ -311,12 +311,13 @@ body::after {
 /* ── Main grid (dashboard) ───────────────────────────────── */
 .dash-grid {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  grid-template-rows: auto auto;
-  gap: 1.25rem;
+  grid-template-columns: 1fr 400px;
+  grid-template-rows: auto;
+  gap: 1.5rem;
+  align-items: start;
 }
 .dash-grid .col-main { display: flex; flex-direction: column; gap: 1.25rem; }
-.dash-grid .col-side  { display: flex; flex-direction: column; gap: 1.25rem; }
+.dash-grid .col-side  { display: flex; flex-direction: column; gap: 1.25rem; position: sticky; top: 1rem; }
 
 /* ── Chart panel ─────────────────────────────────────────── */
 .chart-panel { padding: 1.4rem 1.5rem; }
@@ -726,6 +727,74 @@ body.light-mode .cam-mode-badge {
     border-color: rgba(0,0,0,0.1);
 }
 
+/* ─── RULA / REBA page light mode ────────────────────────── */
+/* Sub-score row items */
+body.light-mode .sub-score {
+    background: rgba(255, 255, 255, 0.75);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+body.light-mode .sub-score:hover {
+    border-color: rgba(13, 115, 119, 0.25);
+    box-shadow: 0 4px 14px rgba(13,115,119,0.1);
+    transform: translateX(3px);
+}
+/* Score bar track — was nearly invisible on white */
+body.light-mode .ss-bar {
+    background: rgba(0, 0, 0, 0.08);
+}
+/* Suppress dark-mode glow on filled bar segments */
+body.light-mode .ss-fill {
+    box-shadow: none;
+    filter: none;
+}
+/* Score values */
+body.light-mode .ss-label {
+    color: #2c3e50;
+}
+/* Group card titles */
+body.light-mode .group-card {
+    background: rgba(255, 255, 255, 0.75);
+}
+/* Final score card — replace dark radial gradient with a light one */
+body.light-mode .final-score-card {
+    background: radial-gradient(ellipse at 50% 0%, rgba(13,115,119,0.08) 0%, transparent 70%);
+    border-top: 2px solid #0d7377;
+}
+/* Final score big number stays as gradient text — visible on both modes */
+body.light-mode .final-score-num {
+    background: linear-gradient(135deg, #0d7377, #7b2fbf);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+body.light-mode .final-score-label {
+    color: #5d6d7e;
+}
+/* Action text box */
+body.light-mode .action-text {
+    background: rgba(13, 115, 119, 0.06);
+    border-color: rgba(13, 115, 119, 0.18);
+    color: #2c3e50;
+}
+/* Metric bar track */
+body.light-mode .metric-bar {
+    background: rgba(0, 0, 0, 0.08);
+}
+/* Suppress glow on metric fill bars */
+body.light-mode .metric-bar-fill {
+    box-shadow: none !important;
+    filter: none;
+}
+/* History / score chart panel */
+body.light-mode .chart-panel {
+    background: rgba(255, 255, 255, 0.75);
+}
+/* Metric value numbers */
+body.light-mode .metric-value {
+    color: #1a3a5c;
+}
+
 /* ─── Shimmer loading placeholder ──────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
@@ -810,4 +879,62 @@ body.light-mode .ai-console {
   background: rgba(0,0,0,0.06);
   color: #0d7377;
   border-color: rgba(0,0,0,0.1);
+}
+
+/* ─── Trend chart cards ──────────────────────────────────── */
+.trend-card {
+  background: rgba(255,255,255,0.02);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.trend-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
+  background: var(--cyan);
+  border-radius: 3px 0 0 3px;
+  opacity: 0.6;
+}
+.trend-card:hover {
+  border-color: rgba(0,212,255,0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.tc-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+  padding-left: 0.5rem;
+}
+
+/* ─── AI Analysis panel enhancements ─────────────────────── */
+.ai-analysis-panel .panel-header {
+  margin-bottom: 0;
+}
+.ai-analysis-panel:hover {
+  border-color: rgba(0,212,255,0.5) !important;
+  box-shadow: 0 0 30px rgba(0,212,255,0.08), 0 15px 35px rgba(0,0,0,0.3) !important;
+}
+
+/* ─── Anomaly panel refinements ──────────────────────────── */
+.anomaly-panel {
+  padding: 1.25rem;
+}
+
+/* ─── Light mode trend cards ─────────────────────────────── */
+body.light-mode .trend-card {
+  background: rgba(255,255,255,0.6);
+  border-color: rgba(0,0,0,0.06);
+}
+body.light-mode .trend-card:hover {
+  border-color: rgba(13,115,119,0.2);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }

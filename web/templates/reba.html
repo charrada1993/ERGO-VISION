@@ -169,22 +169,27 @@
     </div>
 
     <!-- ── Live Camera & Final Score ── -->
-    <div class="assessment-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-bottom: 1.25rem; margin-top: 1.25rem;">
+    <div class="assessment-grid"
+      style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-bottom: 1.25rem; margin-top: 1.25rem;">
       <!-- RGB video feed -->
       <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
         <div class="panel-header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
           <div class="panel-title"><i class="fas fa-video" style="color:var(--cyan)"></i> Live Assessment View</div>
           <div style="display:flex;gap:0.6rem;align-items:center">
-             <span style="font-size: 0.7rem; color: var(--green);">●</span><span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">RGB</span>
+            <span style="font-size: 0.7rem; color: var(--green);">●</span><span
+              style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">RGB</span>
           </div>
         </div>
-        <div style="position: relative; width: 100%; background: #000; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 240px;">
-          <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed" style="width: 100%; height: 100%; object-fit: cover;">
+        <div
+          style="position: relative; width: 100%; background: #000; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 240px;">
+          <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed"
+            style="width: 100%; height: 100%; object-fit: cover;">
         </div>
       </div>
 
       <!-- Final score card -->
-      <div class="card final-score-card" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+      <div class="card final-score-card"
+        style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
         <div class="final-score-num" id="rebaFinalBig">--</div>
         <div class="final-score-label">REBA Final Score</div>
         <div style="margin-top:0.75rem"><span class="risk-chip" id="rebaActionChip">Waiting…</span></div>
@@ -207,53 +212,8 @@
       <canvas id="rebaChart" height="80"></canvas>
     </div>
 
-    <!-- ── Per-body-part angle mini charts ── -->
-    <div
-      style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;margin-bottom:1.25rem">
 
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span style="color:var(--col-trunk)">●</span> Trunk Angle</div>
-        </div>
-        <canvas id="chartTrunk" height="80"></canvas>
-      </div>
 
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span style="color:var(--col-neck)">●</span> Neck Angle</div>
-        </div>
-        <canvas id="chartNeck" height="80"></canvas>
-      </div>
-
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span style="color:var(--col-arm-l)">●</span> Upper Arm Elevation</div>
-        </div>
-        <canvas id="chartArm" height="80"></canvas>
-      </div>
-
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span style="color:var(--col-knee)">●</span> Knee Flexion</div>
-        </div>
-        <canvas id="chartKnee" height="80"></canvas>
-      </div>
-
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span style="color:var(--col-forearm)">●</span> Forearm Angle</div>
-        </div>
-        <canvas id="chartForearm" height="80"></canvas>
-      </div>
-
-      <div class="card chart-panel">
-        <div class="panel-header">
-          <div class="panel-title"><span style="color:var(--col-wrist)">●</span> Wrist Flexion</div>
-        </div>
-        <canvas id="chartWrist" height="80"></canvas>
-      </div>
-
-    </div>
 
   </main>
 
@@ -316,13 +276,7 @@
       }
     });
 
-    // Per-body-part mini charts
-    const cTrunk = mkChart('chartTrunk', '#00d4ff', 'Trunk °');
-    const cNeck = mkChart('chartNeck', '#ff4d6d', 'Neck °');
-    const cArm = mkChart('chartArm', '#00e5a0', 'Upper Arm °');
-    const cKnee = mkChart('chartKnee', '#e85d9b', 'Knee °');
-    const cForearm = mkChart('chartForearm', '#ffc94d', 'Forearm °');
-    const cWrist = mkChart('chartWrist', '#ff7c3e', 'Wrist °');
+
 
     const ACTIONS = [
       '',
@@ -409,20 +363,12 @@
       }
       rebaHistChart.update('none');
 
-      // Per-body-part mini charts — keys match skeleton.py output
-      push(cTrunk,   Math.abs(+(a.trunk || 0)));
-      push(cNeck,    Math.abs(+(a.neck  || 0)));
-      push(cArm,     +(a.upper_arm_left || 0));
-      push(cKnee,    +(a.knee_left  || 0));
-      push(cForearm, +(a.elbow_left || 0));
-      push(cWrist,   Math.abs(+(a.wrist_left || 0)));
     });
 
     function updateChartsTheme(isLight) {
       const gridCol = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)';
       const tickCol = isLight ? '#5d6d7e' : '#6b7a99';
-      const allCharts = [rebaHistChart, cTrunk, cNeck, cArm, cKnee, cForearm, cWrist];
-      allCharts.forEach(c => {
+      [rebaHistChart].forEach(c => {
         if (!c) return;
         Object.values(c.options.scales).forEach(s => {
           if (s.grid) s.grid.color = gridCol;

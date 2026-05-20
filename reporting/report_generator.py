@@ -153,28 +153,52 @@ class ReportGenerator:
         # 5. CLINICAL BIOMECHANICAL ANALYSIS (AI-DRIVEN)
         if 'ai_risk_score' in df.columns and not df['ai_risk_score'].isna().all():
             story.append(Paragraph("3. AI-Driven MSK Diagnostic Assessment", h2_style))
-            ai_sev_val = df['ai_severity'].max()
-            ai_sev = int(ai_sev_val) if pd.notna(ai_sev_val) else 0
-            ai_sev_text = ["Negligible", "Low", "Moderate", "High", "Critical / Pathological"][ai_sev] if 0 <= ai_sev <= 4 else "Unknown"
+            
+            CONDITIONS = [
+                "Normal",
+                "Carpal Tunnel", "Cervical Disc Risk", "Cervicalgia", "De Quervain",
+                "Elbow Epicondylitis", "Elbow Strain", "Frozen Shoulder", "Hip Bursitis",
+                "Hip Flexor Strain", "Low Back Pain", "Lumbar Disc Risk",
+                "Postural Kyphosis", "Rotator Cuff Tendinitis", "Shoulder Bursitis",
+                "Shoulder Impingement", "Tech Neck", "Wrist Tendinitis"
+            ]
+            LOCATIONS = [
+                "None", "Wrist", "Elbow", "Shoulder", "Neck", "Upper Back",
+                "Lower Back", "Hip", "Knee", "Full Body"
+            ]
+            SEVERITIES = ["Healthy", "Low Risk", "Moderate", "High Risk", "Critical"]
+            
+            sev_col = 'ai_severity_code' if 'ai_severity_code' in df.columns else 'ai_severity'
+            ai_sev_val = df[sev_col].max()
+            if pd.api.types.is_numeric_dtype(df[sev_col]):
+                ai_sev = int(ai_sev_val) if pd.notna(ai_sev_val) else 0
+                ai_sev_text = SEVERITIES[ai_sev] if 0 <= ai_sev < len(SEVERITIES) else "Unknown"
+            else:
+                ai_sev_text = str(ai_sev_val)
+                
+            cond_col = 'ai_condition_code' if 'ai_condition_code' in df.columns else 'ai_condition'
+            cond_modes = df[cond_col].mode()
+            if pd.api.types.is_numeric_dtype(df[cond_col]):
+                cond_code = int(cond_modes[0]) if not cond_modes.empty and pd.notna(cond_modes[0]) else 0
+                cond_text = CONDITIONS[cond_code] if 0 <= cond_code < len(CONDITIONS) else "Unknown"
+            else:
+                cond_text = str(cond_modes[0]) if not cond_modes.empty else "Unknown"
+                
+            loc_col = 'ai_location_code' if 'ai_location_code' in df.columns else 'ai_location'
+            loc_modes = df[loc_col].mode()
+            if pd.api.types.is_numeric_dtype(df[loc_col]):
+                loc_code = int(loc_modes[0]) if not loc_modes.empty and pd.notna(loc_modes[0]) else 0
+                loc_text = LOCATIONS[loc_code] if 0 <= loc_code < len(LOCATIONS) else "Unknown"
+            else:
+                loc_text = str(loc_modes[0]) if not loc_modes.empty else "Unknown"
             
             ai_desc = f"ErgoNet v2.0 AI detected a <b>{ai_sev_text}</b> risk of Musculoskeletal symptoms based on 20,000+ training samples. The model evaluates postural synergy rather than isolated angles, providing a high-fidelity 'Stress Index'."
             story.append(Paragraph(ai_desc, clinical_style))
             
-            # Diagnostic Location
-            loc_modes = df['ai_location'].mode()
-            loc_code = int(loc_modes[0]) if not loc_modes.empty and pd.notna(loc_modes[0]) else 0
-            loc_mapping = {
-                1: "Cervical Spine (Neck)",
-                2: "Thoracic/Lumbar Spine (Back)",
-                3: "Glenohumeral Joint (Shoulder)",
-                4: "Elbow / Forearm",
-                5: "Carpal / Wrist"
-            }
-            loc_text = loc_mapping.get(loc_code, f"Code {loc_code}")
-            
             story.append(Spacer(1, 10))
             diag_data = [
-                [Paragraph(f"<b>Primary Biomechanical Focus:</b> {loc_text}", normal_style)],
+                [Paragraph(f"<b>Predicted Musculoskeletal Condition:</b> {cond_text}", normal_style)],
+                [Paragraph(f"<b>Primary Anatomical Locus:</b> {loc_text}", normal_style)],
                 [Paragraph(f"<b>Peak Predicted Stress:</b> {ai_risk_max:.2f} / 10.0", normal_style)],
                 [Paragraph(f"<b>Diagnostic Reliability:</b> 94.2% (v2.0 Backend)", italic_style)]
             ]

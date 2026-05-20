@@ -48,61 +48,6 @@
           style="color:var(--cyan);font-weight:600">Detecting cameras…</span></p>
     </div>
 
-    <!-- ── Metric cards ── -->
-    <div class="metrics-row" style="grid-template-columns:repeat(5,1fr)">
-
-      <div class="card metric-card" style="--accent:var(--cyan)">
-        <div class="metric-label"><i class="fas fa-person-rays" style="color:var(--cyan)"></i> RULA Score</div>
-        <div class="metric-value" id="rulaVal">--</div>
-        <div><span class="risk-chip" id="rulaChip">Waiting</span></div>
-        <div class="metric-bar">
-          <div class="metric-bar-fill" id="rulaBar"></div>
-        </div>
-        <div class="metric-sub">Max 7 · Upper limbs + trunk</div>
-      </div>
-
-      <div class="card metric-card" style="--accent:var(--purple)">
-        <div class="metric-label"><i class="fas fa-person" style="color:var(--purple)"></i> REBA Score</div>
-        <div class="metric-value" id="rebaVal">--</div>
-        <div><span class="risk-chip" id="rebaChip">Waiting</span></div>
-        <div class="metric-bar">
-          <div class="metric-bar-fill" id="rebaBar" style="background:var(--purple);box-shadow:0 0 12px var(--purple)">
-          </div>
-        </div>
-        <div class="metric-sub">Max 15 · Whole body</div>
-      </div>
-
-      <div class="card metric-card" style="--accent:var(--green)">
-        <div class="metric-label"><i class="fas fa-head-side" style="color:var(--col-neck)"></i> Neck Angle</div>
-        <div class="metric-value" id="neckVal">--<small style="font-size:1.2rem">°</small></div>
-        <div class="metric-bar">
-          <div class="metric-bar-fill" id="neckBar"
-            style="background:var(--col-neck);box-shadow:0 0 12px var(--col-neck)"></div>
-        </div>
-        <div class="metric-sub">Flexion / Extension</div>
-      </div>
-
-      <div class="card metric-card" style="--accent:var(--yellow)">
-        <div class="metric-label"><i class="fas fa-person-walking" style="color:var(--col-trunk)"></i> Trunk Angle</div>
-        <div class="metric-value" id="trunkVal">--<small style="font-size:1.2rem">°</small></div>
-        <div class="metric-bar">
-          <div class="metric-bar-fill" id="trunkBar"
-            style="background:var(--col-trunk);box-shadow:0 0 12px var(--col-trunk)"></div>
-        </div>
-        <div class="metric-sub">Forward lean</div>
-      </div>
-
-      <div class="card metric-card" style="--accent:var(--orange)">
-        <div class="metric-label"><i class="fas fa-hand" style="color:var(--col-arm-l)"></i> Upper Arm</div>
-        <div class="metric-value" id="armVal">--<small style="font-size:1.2rem">°</small></div>
-        <div class="metric-bar">
-          <div class="metric-bar-fill" id="armBar"
-            style="background:var(--col-arm-l);box-shadow:0 0 12px var(--col-arm-l)"></div>
-        </div>
-        <div class="metric-sub">Left shoulder elevation</div>
-      </div>
-
-    </div>
 
     <!-- ── Main two-column layout ── -->
     <div class="dash-grid">
@@ -125,9 +70,9 @@
           </div>
           <!-- Video + canvas stacked via CSS Grid for perfect alignment -->
           <div id="videoWrapper"
-            style="display:grid; place-items:center; width:100%; background:#000; min-height:320px; position:relative; overflow:hidden;">
+            style="display:grid; place-items:center; width:100%; background:#000; min-height:380px; position:relative; overflow:hidden;">
             <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed"
-              style="grid-area:1/1; width:100%; height:auto; max-height:480px; display:block;">
+              style="grid-area:1/1; width:100%; height:auto; max-height:520px; display:block;">
             <!-- Skeleton canvas — drawn in JS, sits on top of the img -->
             <canvas id="skelCanvas"
               style="grid-area:1/1; width:100%; height:100%; pointer-events:none; z-index:2;"></canvas>
@@ -172,148 +117,94 @@
           </div>
         </div>
 
-        <!-- Anomaly feed -->
+      </div><!-- /col-main -->
+
+      <!-- RIGHT: sidebar panels -->
+      <div class="col-side">
+
+        <!-- AI Engine Analysis -->
+        <div class="card ai-analysis-panel" id="aiPanel" style="
+          border: 1px solid rgba(0,212,255,0.3);
+          background: linear-gradient(145deg, rgba(0,212,255,0.04) 0%, rgba(155,89,255,0.04) 100%);
+          overflow: hidden;
+        ">
+          <!-- Glowing top border accent -->
+          <div style="height:2px; background:linear-gradient(90deg, var(--cyan), var(--purple)); margin-bottom:0;">
+          </div>
+          <div class="panel-header" style="padding: 1rem 1.25rem 0.5rem;">
+            <div class="panel-title">
+              <i class="fas fa-brain" style="color:var(--cyan)"></i> AI Engine Analysis
+            </div>
+            <span class="badge-pill" id="aiStatus"
+              style="background: linear-gradient(135deg,var(--green),#00b37a); color:#000; font-size:0.6rem;">ACTIVE</span>
+          </div>
+          <div style="padding: 0 1.25rem 1.25rem;">
+            <!-- Model label -->
+            <div
+              style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.85rem; padding:0.5rem 0.75rem; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid var(--border);">
+              <span
+                style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.06em;">Model</span>
+              <span style="color:var(--cyan); font-weight:700; font-size:0.78rem;">ErgoNet v2.0</span>
+            </div>
+            <!-- RULA / REBA big numbers -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.85rem;">
+              <div
+                style="background:rgba(0,212,255,0.06); border:1px solid rgba(0,212,255,0.2); border-radius:12px; padding:1rem; text-align:center;">
+                <div
+                  style="font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--cyan); margin-bottom:0.4rem;">
+                  AI RULA</div>
+                <div id="aiRula"
+                  style="font-size:2rem; font-weight:900; color:var(--cyan); line-height:1; letter-spacing:-1px;">--
+                </div>
+                <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.3rem;">/ 7</div>
+              </div>
+              <div
+                style="background:rgba(155,89,255,0.06); border:1px solid rgba(155,89,255,0.2); border-radius:12px; padding:1rem; text-align:center;">
+                <div
+                  style="font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--purple); margin-bottom:0.4rem;">
+                  AI REBA</div>
+                <div id="aiReba"
+                  style="font-size:2rem; font-weight:900; color:var(--purple); line-height:1; letter-spacing:-1px;">--
+                </div>
+                <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.3rem;">/ 15</div>
+              </div>
+            </div>
+            <!-- Inference feed -->
+            <div id="aiPredictionFeed"
+              style="font-size:0.75rem; color:var(--text-muted); max-height:80px; overflow-y:auto; padding:0.5rem 0.75rem; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid var(--border);">
+              <i class="fas fa-circle-notch fa-spin" style="margin-right:0.4rem;"></i> Waiting for inference...
+            </div>
+            <!-- AI Diagnosis box -->
+            <div id="aiConditionBox" style="margin-top:0.75rem; padding:0.85rem 1rem; border-radius:10px;
+                     background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(155,89,255,0.08));
+                     border:1px solid rgba(0,212,255,0.2); display:none;">
+              <div
+                style="font-size:0.6rem; color:var(--cyan); text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:0.4rem;">
+                <i class="fas fa-microscope"></i> AI Diagnosis
+              </div>
+              <div id="aiCondition"
+                style="font-size:1.05rem; font-weight:800; color:var(--text); margin-bottom:0.2rem;">--</div>
+              <div id="aiSeverity" style="font-size:0.72rem; color:var(--text-muted);">Severity: --</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Posture Event Feed -->
         <div class="card anomaly-panel">
-          <div class="panel-title"><i class="fas fa-triangle-exclamation" style="color:var(--yellow)"></i> Posture Event
-            Feed</div>
+          <div class="panel-title" style="margin-bottom:0.85rem;">
+            <i class="fas fa-triangle-exclamation" style="color:var(--yellow)"></i> Posture Events
+          </div>
           <div class="anomaly-list" id="anomalyFeed">
             <div class="anomaly-item anomaly-ok"><span class="anomaly-icon">✅</span> System initialising — waiting for
               data…</div>
           </div>
         </div>
 
-        <!-- AI Engine Analysis (NEW) -->
-        <div class="card ai-analysis-panel" id="aiPanel"
-          style="border: 1px solid var(--cyan); background: rgba(0,212,255,0.02);">
-          <div class="panel-header">
-            <div class="panel-title"><i class="fas fa-brain" style="color:var(--cyan)"></i> AI Engine Analysis</div>
-            <span class="badge-pill" id="aiStatus" style="background:var(--green); color:#000;">ACTIVE</span>
-          </div>
-          <div style="padding: 0 1rem 1rem 1rem;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.85rem;">
-              <span style="color:var(--text-muted)">Model:</span>
-              <span style="color:var(--cyan); font-weight:600;">ErgoNet v2.0 (Angle-Based)</span>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
-              <div class="ai-stat-box"
-                style="background:rgba(255,255,255,0.03); padding:0.5rem; border-radius:4px; text-align:center;">
-                <div style="font-size:0.7rem; color:var(--text-muted);">AI RULA</div>
-                <div id="aiRula" style="font-size:1.2rem; font-weight:700; color:var(--cyan);">--</div>
-              </div>
-              <div class="ai-stat-box"
-                style="background:rgba(255,255,255,0.03); padding:0.5rem; border-radius:4px; text-align:center;">
-                <div style="font-size:0.7rem; color:var(--text-muted);">AI REBA</div>
-                <div id="aiReba" style="font-size:1.2rem; font-weight:700; color:var(--purple);">--</div>
-              </div>
-            </div>
-            <div id="aiPredictionFeed"
-              style="margin-top:0.75rem; font-size:0.75rem; color:var(--text-muted); max-height:120px; overflow-y:auto;">
-              <i class="fas fa-info-circle"></i> Waiting for landmark inference...
-            </div>
-            <div id="aiConditionBox"
-              style="margin-top:0.75rem; padding:0.5rem; border-radius:4px; background:rgba(0,0,0,0.2); display:none;">
-              <div style="font-size:0.65rem; color:var(--cyan); text-transform:uppercase; letter-spacing:1px;">AI
-                Diagnosis (Experimental)</div>
-              <div id="aiCondition" style="font-size:0.9rem; font-weight:700; color:#fff; margin-top:2px;">--</div>
-              <div id="aiSeverity" style="font-size:0.75rem; color:var(--text-muted);">Severity: --</div>
-            </div>
-          </div>
-        </div>
-
-      </div><!-- /col-main -->
-
-      <!-- RIGHT: body diagram + camera info -->
-      <div class="col-side">
-
-        <!-- Body diagram -->
-        <div class="card body-panel">
-          <div class="panel-title" style="margin-bottom:0.75rem"><i class="fas fa-person" style="color:var(--cyan)"></i>
-            Body Risk Map</div>
-
-          <div class="body-diagram-wrap">
-            <!-- SVG stick-figure -->
-            <svg class="body-svg" viewBox="0 0 100 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <!-- Head -->
-              <circle cx="50" cy="18" r="12" stroke-width="1.5" />
-              <!-- Neck -->
-              <line x1="50" y1="30" x2="50" y2="42" stroke-width="1.5" />
-              <!-- Shoulders -->
-              <line x1="22" y1="52" x2="78" y2="52" stroke-width="1.5" />
-              <!-- Spine -->
-              <line x1="50" y1="52" x2="50" y2="110" stroke-width="1.5" />
-              <!-- Left arm -->
-              <line x1="22" y1="52" x2="10" y2="85" stroke-width="1.5" />
-              <line x1="10" y1="85" x2="5" y2="115" stroke-width="1.5" />
-              <!-- Right arm -->
-              <line x1="78" y1="52" x2="90" y2="85" stroke-width="1.5" />
-              <line x1="90" y1="85" x2="95" y2="115" stroke-width="1.5" />
-              <!-- Hips -->
-              <line x1="35" y1="110" x2="65" y2="110" stroke-width="1.5" />
-              <!-- Left leg -->
-              <line x1="35" y1="110" x2="30" y2="170" stroke-width="1.5" />
-              <line x1="30" y1="170" x2="28" y2="220" stroke-width="1.5" />
-              <!-- Right leg -->
-              <line x1="65" y1="110" x2="70" y2="170" stroke-width="1.5" />
-              <line x1="70" y1="170" x2="72" y2="220" stroke-width="1.5" />
-            </svg>
-
-            <!-- Joint dots (positioned absolutely over SVG using percentage) -->
-            <!-- Neck -->
-            <div class="joint-dot ok" id="jd-neck" data-label="Neck" style="top:16%;left:50%"></div>
-            <!-- Trunk (mid-spine) -->
-            <div class="joint-dot ok" id="jd-trunk" data-label="Trunk" style="top:37%;left:50%"></div>
-            <!-- Left shoulder -->
-            <div class="joint-dot ok" id="jd-shl" data-label="Shoulder L" style="top:22%;left:24%"></div>
-            <!-- Right shoulder -->
-            <div class="joint-dot ok" id="jd-shr" data-label="Shoulder R" style="top:22%;left:76%"></div>
-            <!-- Left elbow -->
-            <div class="joint-dot ok" id="jd-ell" data-label="Elbow L" style="top:37%;left:12%"></div>
-            <!-- Right elbow -->
-            <div class="joint-dot ok" id="jd-elr" data-label="Elbow R" style="top:37%;left:88%"></div>
-            <!-- Left wrist -->
-            <div class="joint-dot ok" id="jd-wrl" data-label="Wrist L" style="top:50%;left:7%"></div>
-            <!-- Right wrist -->
-            <div class="joint-dot ok" id="jd-wrr" data-label="Wrist R" style="top:50%;left:93%"></div>
-            <!-- Hips -->
-            <div class="joint-dot ok" id="jd-hip" data-label="Hip" style="top:48%;left:50%"></div>
-            <!-- Left knee -->
-            <div class="joint-dot ok" id="jd-knl" data-label="Knee L" style="top:72%;left:32%"></div>
-            <!-- Right knee -->
-            <div class="joint-dot ok" id="jd-knr" data-label="Knee R" style="top:72%;left:68%"></div>
-          </div>
-
-          <!-- Per-joint angle readouts -->
-          <div class="joint-readouts">
-            <div class="joint-readout">
-              <div class="jr-label" style="color:var(--col-neck)">● Neck</div>
-              <div class="jr-value" id="jr-neck">--<span class="jr-unit">°</span></div>
-            </div>
-            <div class="joint-readout">
-              <div class="jr-label" style="color:var(--col-trunk)">● Trunk</div>
-              <div class="jr-value" id="jr-trunk">--<span class="jr-unit">°</span></div>
-            </div>
-            <div class="joint-readout">
-              <div class="jr-label" style="color:var(--col-arm-l)">● Arm L</div>
-              <div class="jr-value" id="jr-arml">--<span class="jr-unit">°</span></div>
-            </div>
-            <div class="joint-readout">
-              <div class="jr-label" style="color:var(--col-arm-r)">● Arm R</div>
-              <div class="jr-value" id="jr-armr">--<span class="jr-unit">°</span></div>
-            </div>
-            <div class="joint-readout">
-              <div class="jr-label" style="color:var(--col-forearm)">● Forearm</div>
-              <div class="jr-value" id="jr-forearm">--<span class="jr-unit">°</span></div>
-            </div>
-            <div class="joint-readout">
-              <div class="jr-label" style="color:var(--col-wrist)">● Wrist</div>
-              <div class="jr-value" id="jr-wrist">--<span class="jr-unit">°</span></div>
-            </div>
-          </div>
-        </div>
-        <!-- Camera mode info panel (replaces IMU panel) -->
+        <!-- Camera System -->
         <div class="card cam-mode-panel">
-          <div class="panel-title" style="margin-bottom:0.85rem"><i class="fas fa-camera" style="color:var(--cyan)"></i>
-            Camera System</div>
+          <div class="panel-title" style="margin-bottom:0.85rem">
+            <i class="fas fa-camera" style="color:var(--cyan)"></i> Camera System
+          </div>
           <div class="cam-mode-badge"><i class="fas fa-circle-dot"></i> <span id="camModeBadge">Detecting…</span></div>
           <div class="cam-stat-grid">
             <div class="cam-info-item">
@@ -334,58 +225,88 @@
             </div>
           </div>
         </div>
+
       </div><!-- /col-side -->
     </div><!-- /dash-grid -->
 
     <!-- ── Joint Angle Trends ── -->
-    <div class="card trends-panel" style="margin-top: 1.5rem; border: 1px solid var(--border); background: var(--panel-bg);">
-      <div class="panel-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;">
-        <div class="panel-title" style="text-transform: uppercase; letter-spacing: 2px; font-size: 0.95rem; color: var(--text-muted); font-weight: 700;">JOINT ANGLE TRENDS</div>
+    <div class="card trends-panel" style="margin-top: 1.5rem; overflow:hidden;">
+      <!-- Gradient header band -->
+      <div
+        style="background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(155,89,255,0.06) 100%); border-bottom: 1px solid var(--border); padding: 1.1rem 1.5rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div
+              style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:2.5px; color:var(--text-muted); margin-bottom:0.2rem;">
+              Real-Time Analytics</div>
+            <div style="font-size:1.05rem; font-weight:800; color:var(--text);">Joint Angle Trends</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <span
+              style="width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);display:inline-block;"></span>
+            <span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;">Live · 12 joints</span>
+          </div>
+        </div>
       </div>
-      <div class="trends-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem;">
+      <div class="trends-grid"
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; padding: 1.25rem;">
         <!-- Neck -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">NECK</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            NECK</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― Neck</span> <span style="color:#ffb84d;">― Neck Roll</span> <span style="color:#ff4d6d;">― Neck Yaw</span>
+            <span style="color:#00d4ff;">― Neck</span> <span style="color:#ffb84d;">― Neck Roll</span> <span
+              style="color:#ff4d6d;">― Neck Yaw</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-neck"></canvas>
           </div>
         </div>
         <!-- Trunk -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">BACK / TRUNK</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            BACK / TRUNK</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― Trunk Pitch</span> <span style="color:#ffb84d;">― Trunk Roll</span> <span style="color:#ff4d6d;">― Trunk Yaw</span>
+            <span style="color:#00d4ff;">― Trunk Pitch</span> <span style="color:#ffb84d;">― Trunk Roll</span> <span
+              style="color:#ff4d6d;">― Trunk Yaw</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-trunk"></canvas>
           </div>
         </div>
         <!-- Right Shoulder -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT SHOULDER</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            RIGHT SHOULDER</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― R Shoulder</span> <span style="color:#00ffaa;">― R Shoulder Abduction</span>
+            <span style="color:#00d4ff;">― R Shoulder</span> <span style="color:#00ffaa;">― R Shoulder
+              Abduction</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-rshl"></canvas>
           </div>
         </div>
         <!-- Left Shoulder -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT SHOULDER</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            LEFT SHOULDER</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― L Shoulder</span> <span style="color:#00ffaa;">― L Shoulder Abduction</span>
+            <span style="color:#00d4ff;">― L Shoulder</span> <span style="color:#00ffaa;">― L Shoulder
+              Abduction</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-lshl"></canvas>
           </div>
         </div>
         <!-- Right Elbow -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT ELBOW</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            RIGHT ELBOW</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
             <span style="color:#00d4ff;">― R Elbow</span> <span style="color:#ffb84d;">― R Elbow Roll</span>
           </div>
@@ -394,8 +315,10 @@
           </div>
         </div>
         <!-- Left Elbow -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT ELBOW</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            LEFT ELBOW</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
             <span style="color:#00d4ff;">― L Elbow</span> <span style="color:#ffb84d;">― L Elbow Roll</span>
           </div>
@@ -404,48 +327,62 @@
           </div>
         </div>
         <!-- Right Wrist -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT WRIST</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            RIGHT WRIST</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― R Wrist</span> <span style="color:#ffb84d;">― R Wrist Roll</span> <span style="color:#ff4d6d;">― R Wrist Yaw</span>
+            <span style="color:#00d4ff;">― R Wrist</span> <span style="color:#ffb84d;">― R Wrist Roll</span> <span
+              style="color:#ff4d6d;">― R Wrist Yaw</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-rwri"></canvas>
           </div>
         </div>
         <!-- Left Wrist -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT WRIST</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            LEFT WRIST</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― L Wrist</span> <span style="color:#ffb84d;">― L Wrist Roll</span> <span style="color:#ff4d6d;">― L Wrist Yaw</span>
+            <span style="color:#00d4ff;">― L Wrist</span> <span style="color:#ffb84d;">― L Wrist Roll</span> <span
+              style="color:#ff4d6d;">― L Wrist Yaw</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-lwri"></canvas>
           </div>
         </div>
         <!-- Right Thigh -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT THIGH</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            RIGHT THIGH</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― R Thigh</span> <span style="color:#ffb84d;">― R Thigh Roll</span> <span style="color:#ff4d6d;">― R Thigh Yaw</span>
+            <span style="color:#00d4ff;">― R Thigh</span> <span style="color:#ffb84d;">― R Thigh Roll</span> <span
+              style="color:#ff4d6d;">― R Thigh Yaw</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-rthi"></canvas>
           </div>
         </div>
         <!-- Left Thigh -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT THIGH</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            LEFT THIGH</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
-            <span style="color:#00d4ff;">― L Thigh</span> <span style="color:#ffb84d;">― L Thigh Roll</span> <span style="color:#ff4d6d;">― L Thigh Yaw</span>
+            <span style="color:#00d4ff;">― L Thigh</span> <span style="color:#ffb84d;">― L Thigh Roll</span> <span
+              style="color:#ff4d6d;">― L Thigh Yaw</span>
           </div>
           <div class="tc-chart" style="height: 140px; position: relative;">
             <canvas id="trend-lthi"></canvas>
           </div>
         </div>
         <!-- Right Knee -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">RIGHT KNEE</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            RIGHT KNEE</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
             <span style="color:#00d4ff;">― R Knee</span>
           </div>
@@ -454,8 +391,10 @@
           </div>
         </div>
         <!-- Left Knee -->
-        <div class="trend-card" style="background: rgba(100,100,100,0.05); border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div class="tc-title" style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">LEFT KNEE</div>
+        <div class="trend-card">
+          <div class="tc-title"
+            style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; color: var(--text-muted);">
+            LEFT KNEE</div>
           <div class="tc-legend" style="display:flex; gap:0.5rem; font-size:0.6rem; margin-bottom:0.5rem;">
             <span style="color:#00d4ff;">― L Knee</span>
           </div>
@@ -475,7 +414,8 @@
           style="color:var(--text-muted);font-size:0.7rem"></i> Mode: <strong id="sysMode">--</strong></div>
       <div class="status-chip"
         style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
-        <i class="fas fa-gauge" style="color:var(--cyan)"></i> FPS <strong id="fpsStat">--</strong> &nbsp;|&nbsp; Frames
+        <i class="fas fa-gauge" style="color:var(--cyan)"></i> FPS <strong id="fpsStat">--</strong> &nbsp;|&nbsp;
+        Frames
         <strong id="frameStat">0</strong>
       </div>
     </div>
