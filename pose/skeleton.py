@@ -216,8 +216,18 @@ class SkeletonBuilder:
         angles['trunk_mod'] = 1 if abs(trunk_lat) > 15 else 0
         angles['trunk_roll'] = trunk_lat
 
-        # Trunk rotation (Yaw)
-        angles['trunk_rot'] = 0   # requires two-camera or IMU; set 0
+        # Trunk rotation (Yaw) — estimated from shoulder-line vs. hip-line orientation
+        # Both vectors projected to horizontal plane, angle between them
+        v_shl_line = r_shl - l_shl   # left → right shoulder
+        v_hip_line = r_hip - l_hip   # left → right hip
+        v_shl_h = v_shl_line - np.dot(v_shl_line, v_up) * v_up
+        v_hip_h = v_hip_line - np.dot(v_hip_line, v_up) * v_up
+        if np.linalg.norm(v_shl_h) > 1e-6 and np.linalg.norm(v_hip_h) > 1e-6:
+            trunk_yaw = _signed_angle_deg(v_hip_h, v_shl_h, v_up)
+        else:
+            trunk_yaw = 0.0
+        angles['trunk_yaw'] = trunk_yaw
+        angles['trunk_rot']  = trunk_yaw   # keep legacy key
 
         # ── NECK (head) flexion ───────────────────────────────────────────
         # Vector: mid_shoulder → nose  (head direction)
@@ -226,10 +236,17 @@ class SkeletonBuilder:
         # Positive = head forward of trunk axis
         angles['neck'] = neck_flex
 
-        # Neck lateral tilt
+        # Neck lateral tilt (Roll) — head tilts left/right
         neck_lat = _signed_angle_deg(v_up, _norm(v_neck), v_fwd)
         angles['neck_mod'] = 1 if abs(neck_lat) > 10 else 0
         angles['neck_roll'] = neck_lat
+
+        # Neck yaw (rotation) — head turns left/right
+        # Project neck vector onto horizontal plane (perpendicular to body vertical)
+        # and measure rotation relative to the forward axis
+        v_neck_h = v_neck - np.dot(v_neck, v_up) * v_up   # horizontal component
+        neck_yaw = _signed_angle_deg(v_fwd, v_neck_h, v_up) if np.linalg.norm(v_neck_h) > 1e-6 else 0.0
+        angles['neck_yaw'] = neck_yaw
 
         # ── SHOULDER elevation (left) ────────────────────────────────────
         # Upper-arm vector: shoulder → elbow
@@ -265,11 +282,36 @@ class SkeletonBuilder:
         elbow_interior_l = _angle_deg(v1_l, v2_l)
         angles['elbow_left'] = elbow_interior_l   # RULA uses this directly (60-100° = score 1)
 
+        # Elbow roll (forearm pronation/supination) — left
+        # Computed as the angle of the forearm axis rotated around the upper-arm axis
+        v_ua_l_n = _norm(v_ua_l)                        # upper arm axis (norm)
+        v_fa_l_n = _norm(l_wrist - l_elbow)             # forearm axis (norm)
+        # Reference vector perpendicular to upper arm in the body sagittal plane
+        v_ref_l  = _norm(np.cross(v_ua_l_n, v_right))
+        # Project forearm onto plane perpendicular to upper arm
+        v_fa_perp_l = v_fa_l_n - np.dot(v_fa_l_n, v_ua_l_n) * v_ua_l_n
+        if np.linalg.norm(v_fa_perp_l) > 1e-6:
+            elb_roll_l = _signed_angle_deg(v_ref_l, v_fa_perp_l, v_ua_l_n)
+        else:
+            elb_roll_l = 0.0
+        angles['elb_roll_l'] = elb_roll_l
+
         # ── ELBOW flexion (right) ────────────────────────────────────────
         v1_r = r_shl - r_elbow
         v2_r = r_wrist - r_elbow
         elbow_interior_r = _angle_deg(v1_r, v2_r)
         angles['elbow_right'] = elbow_interior_r
+
+        # Elbow roll (forearm pronation/supination) — right
+        v_ua_r_n = _norm(v_ua_r)
+        v_fa_r_n = _norm(r_wrist - r_elbow)
+        v_ref_r  = _norm(np.cross(v_ua_r_n, v_right))
+        v_fa_perp_r = v_fa_r_n - np.dot(v_fa_r_n, v_ua_r_n) * v_ua_r_n
+        if np.linalg.norm(v_fa_perp_r) > 1e-6:
+            elb_roll_r = _signed_angle_deg(v_ref_r, v_fa_perp_r, v_ua_r_n)
+        else:
+            elb_roll_r = 0.0
+        angles['elb_roll_r'] = elb_roll_r
 
         # ── WRIST flexion (left) ─────────────────────────────────────────
         # Forearm axis: elbow → wrist
@@ -283,6 +325,23 @@ class SkeletonBuilder:
             wrist_flex_l = 0.0
         angles['wrist_left'] = wrist_flex_l
 
+        # Wrist roll (radial/ulnar deviation) and yaw (pronation twist) — left
+        v_fa_l_n  = _norm(v_fa_l)
+        if np.linalg.norm(v_hand_l) > 1e-6:
+            v_hand_l_n = _norm(v_hand_l)
+            # Roll: deviation in the plane defined by forearm and body-up
+            v_fa_up_l  = _norm(np.cross(v_fa_l_n, v_right))
+            v_hand_perp_l = v_hand_l_n - np.dot(v_hand_l_n, v_fa_l_n) * v_fa_l_n
+            if np.linalg.norm(v_hand_perp_l) > 1e-6:
+                wri_roll_l = _signed_angle_deg(v_fa_up_l, v_hand_perp_l, v_fa_l_n)
+                wri_yaw_l  = _signed_angle_deg(v_right,   v_hand_perp_l, v_fa_l_n)
+            else:
+                wri_roll_l = wri_yaw_l = 0.0
+        else:
+            wri_roll_l = wri_yaw_l = 0.0
+        angles['wri_roll_l'] = wri_roll_l
+        angles['wri_yaw_l']  = wri_yaw_l
+
         # ── WRIST flexion (right) ────────────────────────────────────────
         v_fa_r = r_wrist - r_elbow
         v_hand_r = r_index - r_wrist
@@ -292,6 +351,22 @@ class SkeletonBuilder:
         else:
             wrist_flex_r = 0.0
         angles['wrist_right'] = wrist_flex_r
+
+        # Wrist roll and yaw — right
+        v_fa_r_n  = _norm(v_fa_r)
+        if np.linalg.norm(v_hand_r) > 1e-6:
+            v_hand_r_n = _norm(v_hand_r)
+            v_fa_up_r  = _norm(np.cross(v_fa_r_n, v_right))
+            v_hand_perp_r = v_hand_r_n - np.dot(v_hand_r_n, v_fa_r_n) * v_fa_r_n
+            if np.linalg.norm(v_hand_perp_r) > 1e-6:
+                wri_roll_r = _signed_angle_deg(v_fa_up_r, v_hand_perp_r, v_fa_r_n)
+                wri_yaw_r  = _signed_angle_deg(v_right,   v_hand_perp_r, v_fa_r_n)
+            else:
+                wri_roll_r = wri_yaw_r = 0.0
+        else:
+            wri_roll_r = wri_yaw_r = 0.0
+        angles['wri_roll_r'] = wri_roll_r
+        angles['wri_yaw_r']  = wri_yaw_r
 
         # ── KNEE flexion (left) ──────────────────────────────────────────
         # Interior angle at knee:
@@ -315,7 +390,7 @@ class SkeletonBuilder:
         # Legs stable heuristic
         angles['legs_stable'] = True
 
-        # Hip flexion (for ErgoNet v2 inputs)
+        # Hip/thigh flexion (for ErgoNet v2 inputs)
         v_torso_l = l_shl - l_hip
         v_thigh_down_l = l_knee - l_hip
         hip_flex_l = _signed_angle_deg(v_torso_l, v_thigh_down_l, v_right)
@@ -325,6 +400,29 @@ class SkeletonBuilder:
         v_thigh_down_r = r_knee - r_hip
         hip_flex_r = _signed_angle_deg(v_torso_r, v_thigh_down_r, v_right)
         angles['hip_right'] = hip_flex_r
+
+        # Thigh roll (adduction/abduction in frontal plane) and yaw (internal rotation)
+        # Left thigh
+        v_thi_l_n = _norm(v_thigh_down_l)
+        v_thi_h_l = v_thigh_down_l - np.dot(v_thigh_down_l, v_up) * v_up  # horizontal component
+        if np.linalg.norm(v_thi_h_l) > 1e-6:
+            thi_roll_l = _signed_angle_deg(v_right, _norm(v_thi_h_l), v_up)
+            thi_yaw_l  = _signed_angle_deg(v_fwd,   _norm(v_thi_h_l), v_up)
+        else:
+            thi_roll_l = thi_yaw_l = 0.0
+        angles['thi_roll_l'] = thi_roll_l
+        angles['thi_yaw_l']  = thi_yaw_l
+
+        # Right thigh
+        v_thi_r_n = _norm(v_thigh_down_r)
+        v_thi_h_r = v_thigh_down_r - np.dot(v_thigh_down_r, v_up) * v_up
+        if np.linalg.norm(v_thi_h_r) > 1e-6:
+            thi_roll_r = _signed_angle_deg(v_right, _norm(v_thi_h_r), v_up)
+            thi_yaw_r  = _signed_angle_deg(v_fwd,   _norm(v_thi_h_r), v_up)
+        else:
+            thi_roll_r = thi_yaw_r = 0.0
+        angles['thi_roll_r'] = thi_roll_r
+        angles['thi_yaw_r']  = thi_yaw_r
 
         return angles
 

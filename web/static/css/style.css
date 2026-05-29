@@ -588,6 +588,13 @@ body.light-mode .body-svg line { stroke: rgba(0,0,0,0.15); }
 /* Timeline chart */
 .history-chart { padding: 1.4rem; }
 
+/* ── Trend card RPY numeric badge row ───────────────────────── */
+/* Light-mode: flip badge background/border so they remain legible */
+body.light-mode .tc-chart + div > div {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .dash-grid { grid-template-columns: 1fr; }

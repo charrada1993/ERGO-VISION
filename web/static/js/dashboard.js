@@ -175,7 +175,19 @@ const TREND_DEFS = [
   { id: 'trend-lkne', max: 180, min: -180, lines: [{key: 'knee_left', color: '#00d4ff'}] },
 ];
 
+// ── Axis label mapping for numeric badges ────────────────────────────────
+// Maps angle key suffix → short display label used in the RPY badge row.
+function _axisLabel(key) {
+  if (key.endsWith('_yaw')   || key === 'trunk_yaw')    return 'Yaw';
+  if (key.endsWith('_roll')  || key.includes('roll'))   return 'Roll';
+  if (key.startsWith('abd')) return 'Abd';
+  // Primary angle key (no suffix) = Pitch / Flex
+  return 'Pitch';
+}
+
 const trendCharts = {};
+const trendBadgeIds = {};   // def.id → [{elId, key}, ...]
+
 TREND_DEFS.forEach(def => {
   const el = document.getElementById(def.id);
   if (!el) return;
@@ -199,7 +211,43 @@ TREND_DEFS.forEach(def => {
       }
     }
   });
+
+  // ── Inject numeric RPY badge row ──────────────────────────────────────
+  // Find the parent .tc-chart wrapper that holds the canvas
+  const tcChart = el.closest('.tc-chart') || el.parentElement;
+  const badgeRow = document.createElement('div');
+  badgeRow.style.cssText = [
+    'display:flex', 'gap:0.4rem', 'flex-wrap:wrap',
+    'margin-top:0.4rem', 'justify-content:center'
+  ].join(';');
+
+  trendBadgeIds[def.id] = [];
+
+  def.lines.forEach(l => {
+    const label = _axisLabel(l.key);
+    const badge = document.createElement('div');
+    const valueId = 'tval-' + def.id.replace('trend-', '') + '-' + l.key;
+    badge.style.cssText = [
+      'display:inline-flex', 'align-items:center', 'gap:0.25rem',
+      'background:rgba(255,255,255,0.04)', 'border:1px solid rgba(255,255,255,0.08)',
+      'border-radius:6px', 'padding:2px 7px', 'font-size:0.62rem',
+      'font-family:"JetBrains Mono",monospace'
+    ].join(';');
+    badge.innerHTML = [
+      `<span style="color:${l.color};font-weight:700">${label}</span>`,
+      `<span id="${valueId}" style="color:var(--text);min-width:34px;text-align:right">--</span>`,
+      `<span style="color:var(--text-muted)">°</span>`
+    ].join('');
+    badgeRow.appendChild(badge);
+    trendBadgeIds[def.id].push({ elId: valueId, key: l.key });
+  });
+
+  // Insert badge row after the canvas wrapper
+  if (tcChart && tcChart.parentElement) {
+    tcChart.parentElement.insertBefore(badgeRow, tcChart.nextSibling);
+  }
 });
+
 // ══════════════════════════════════════════════════════════
 //  Tab switching
 // ══════════════════════════════════════════════════════════
@@ -357,11 +405,18 @@ socket.on('pose_update', (data) => {
     isAI = true;
   }
 
-  document.getElementById('neckVal').innerHTML  = neck  + '<small style="font-size:1.2rem">°</small>';
-  document.getElementById('trunkVal').innerHTML = trunk + '<small style="font-size:1.2rem">°</small>';
-  document.getElementById('armVal').innerHTML   = armL  + '<small style="font-size:1.2rem">°</small>';
-  document.getElementById('rulaVal').textContent = rulaScore;
-  document.getElementById('rebaVal').textContent = rebaScore;
+  const neckValEl = document.getElementById('neckVal');
+  if (neckValEl) neckValEl.innerHTML  = neck  + '<small style="font-size:1.2rem">°</small>';
+  const trunkValEl = document.getElementById('trunkVal');
+  if (trunkValEl) trunkValEl.innerHTML = trunk + '<small style="font-size:1.2rem">°</small>';
+  const armValEl = document.getElementById('armVal');
+  if (armValEl) armValEl.innerHTML   = armL  + '<small style="font-size:1.2rem">°</small>';
+  
+  const rulaValEl = document.getElementById('rulaVal');
+  if (rulaValEl) rulaValEl.textContent = rulaScore;
+  
+  const rebaValEl = document.getElementById('rebaVal');
+  if (rebaValEl) rebaValEl.textContent = rebaScore;
 
   // Visual indicator for AI-driven results
   const rulaLabel = document.querySelector('[style*="var(--cyan)"] .metric-label');
@@ -370,9 +425,9 @@ socket.on('pose_update', (data) => {
   }
 
   // AI badge: inject once only
-  if (isAI && !document.querySelector('.ai-badge')) {
+  if (isAI && rulaValEl && !document.querySelector('.ai-badge')) {
     const badgeHtml = '<span class="ai-badge" style="font-size:0.6rem; background:var(--cyan); color:#000; padding:1px 4px; border-radius:3px; margin-left:5px; vertical-align:middle; font-weight:800;">AI</span>';
-    document.getElementById('rulaVal').insertAdjacentHTML('afterend', badgeHtml);
+    rulaValEl.insertAdjacentHTML('afterend', badgeHtml);
   }
 
   // Progress bars
@@ -425,7 +480,7 @@ socket.on('pose_update', (data) => {
   // ── 5. RULA/REBA chart ──
   pushRolling(scoreChart, ts, +(data.rula || 0), +(data.reba || 0));
 
-  // ── 6. Update Trend Charts ──
+  // ── 6. Update Trend Charts + numeric badges ──
   const tA = data.angles || {};
   TREND_DEFS.forEach(def => {
     const chart = trendCharts[def.id];
@@ -435,6 +490,19 @@ socket.on('pose_update', (data) => {
         return (v !== undefined && v !== null) ? v : 0;
     });
     pushRolling(chart, ts, ...vals);
+
+    // Update numeric badge values
+    const badges = trendBadgeIds[def.id];
+    if (badges) {
+      badges.forEach((b, i) => {
+        const el = document.getElementById(b.elId);
+        if (!el) return;
+        const raw = tA[b.key];
+        el.textContent = (raw !== undefined && raw !== null)
+          ? (+raw).toFixed(1)
+          : '--';
+      });
+    }
   });
 
 
@@ -528,7 +596,7 @@ function updateChartsTheme(isLight) {
       if (s.grid) s.grid.color = gridCol;
       if (s.ticks) s.ticks.color = tickCol;
     });
-    if (c.options.plugins.legend && c.options.plugins.legend.labels) {
+    if (c.options.plugins && c.options.plugins.legend && c.options.plugins.legend.labels) {
       c.options.plugins.legend.labels.color = tickCol;
     }
     c.update();
