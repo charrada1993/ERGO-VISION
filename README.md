@@ -1,123 +1,179 @@
-> **Real-time ergonomic posture assessment system** using 1–3 OAK-D cameras, MediaPipe pose estimation, and **ErgoNet v2.0 Neural Engine** — trained to **97.14% accuracy** on 20,000+ TMS samples for clinical-grade musculoskeletal diagnostics.
+# ERGO-VISION 🦺
 
-*Last updated: 2026-05-11 — ErgoNet v2.0 training complete (Loss: 0.2742, Acc: 97.14%, Val Acc: 94.22%)*
+> **Real-time ergonomic posture assessment system** powered by OAK-D depth cameras, MediaPipe pose estimation, and **ErgoNet v2.0 Neural Engine** — trained to **97.14% accuracy** on 20,000+ TMS samples for clinical-grade musculoskeletal diagnostics.
+
+*Last updated: 2026-05-29 — Full RPY joint angle computation + live dashboard chart fix*
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
-2. [System Architecture](#system-architecture)
-3. [Features](#features)
-4. [Hardware Requirements](#hardware-requirements)
-5. [Software Requirements](#software-requirements)
+2. [Technology Stack](#technology-stack)
+3. [System Architecture](#system-architecture)
+4. [Features](#features)
+5. [Hardware Requirements](#hardware-requirements)
 6. [Project Structure](#project-structure)
 7. [Installation](#installation)
 8. [Quick Start](#quick-start)
-9. [Modules Documentation](#modules-documentation)
-   - [Camera Manager](#camera-manager)
-   - [Visual IMU](#visual-imu)
-   - [Pose Estimation](#pose-estimation)
-   - [Ergonomic Scoring (RULA & REBA)](#ergonomic-scoring-rula--reba)
-   - [Web Dashboard](#web-dashboard)
-   - [Data Logging & Reports](#data-logging--reports)
-10. [RULA Scoring Reference](#rula-scoring-reference)
-11. [REBA Scoring Reference](#reba-scoring-reference)
-12. [Visual IMU Formulas](#visual-imu-formulas)
-13. [Configuration](#configuration)
-14. [API Reference](#api-reference)
-15. [Troubleshooting](#troubleshooting)
-16. [Contributing](#contributing)
+9. [Joint Angles Computed](#joint-angles-computed)
+10. [API Reference](#api-reference)
+11. [RULA / REBA Scoring Reference](#rula--reba-scoring-reference)
+12. [Configuration](#configuration)
+13. [Troubleshooting](#troubleshooting)
+14. [Contributing](#contributing)
 
 ---
 
 ## Overview
 
-**ERGO-VISION** is a fully open-source, real-time ergonomic risk assessment system designed for industrial and occupational health environments. It uses one to three **OAK-D** (OpenCV AI Kit with Depth) cameras to:
+**ERGO-VISION** is a fully open-source, real-time ergonomic risk assessment platform for industrial and occupational health environments. It uses OAK-D depth cameras to capture synchronized RGB + stereo depth streams, runs MediaPipe pose estimation, computes 30+ joint angles (including full Roll/Pitch/Yaw per joint), and streams everything to a live web dashboard with Chart.js real-time sparklines.
 
-- Capture synchronized **RGB + aligned stereo depth** streams
-- Detect and track human body keypoints with **MediaPipe Pose** (Optimized for NVIDIA Jetson Orin)
-- **Depth-Based Masking**: Auto-filters background workers for robust single-subject tracking
-- **AI Engine (v2.0)**: Angle-based MLP trained on **20,000+ TMS enriched samples** — 97.14% train accuracy, 94.22% validation accuracy
-- **Clinical Diagnostics**: Predicts musculoskeletal conditions (Tendinitis, Back Pain, etc.) and severity levels
-- **Display everything** on a live Flask + Socket.IO web dashboard with interactive AI evaluation curves
-- **Data Collection**: Record multi-joint kinematic sessions to timestamped CSV files
-- **Automated Reporting**: Generate professional **PDF ergonomic risk reports** with AI-driven clinical insights
+---
 
-The system runs on **NVIDIA Jetson Orin** (Ubuntu) or any Linux/Windows machine with Python 3.10+.
+## Technology Stack
+
+### 🖥️ Hardware Platform
+
+| Component | Technology | Role |
+|---|---|---|
+| Edge AI Computer | **NVIDIA Jetson Orin** (reComputer J3011) | Main inference host (ARM Cortex-A78AE + CUDA) |
+| Depth Camera | **Luxonis OAK-D** (OpenCV AI Kit with Depth) | RGB 1280×720 + aligned stereo depth |
+| USB | **USB 2.0 / USB 3.0** | Camera data transport via XLink protocol |
+
+---
+
+### 🐍 Backend — Python
+
+| Library | Version | Role |
+|---|---|---|
+| **Python** | 3.10+ | Primary language |
+| **depthai** | 2.24+ | OAK-D camera SDK — pipeline, XLink queues, depth post-processing |
+| **mediapipe** | 0.10+ | Human pose estimation — 33 body keypoints (x, y, z) |
+| **opencv-python** | 4.8+ | Image processing, Lucas-Kanade optical flow, MJPEG streaming |
+| **numpy** | 1.24+ | All 3D vector maths, angle computation, EMA smoothing |
+| **flask** | 3.0+ | Web server and HTTP routes |
+| **flask-socketio** | 5.3+ | Real-time WebSocket communication (Socket.IO v4) |
+| **simple-websocket** | — | WebSocket backend transport for Flask-SocketIO |
+| **pandas** | 2.0+ | Session CSV logging and data export |
+| **matplotlib** | 3.7+ | Time-series chart generation for PDF reports |
+| **reportlab** | 4.0+ | PDF ergonomic report builder |
+
+---
+
+### 🌐 Frontend — Web Dashboard
+
+| Technology | Version | Role |
+|---|---|---|
+| **HTML5** | — | Page structure and semantic layout |
+| **Vanilla CSS3** | — | Glassmorphic dark theme, CSS custom properties (design tokens) |
+| **JavaScript (ES2020)** | — | All client-side logic, DOM manipulation |
+| **Socket.IO Client** | 4.5.0 | Real-time WebSocket data reception from Flask backend |
+| **Chart.js** | 4.4.0 | Live rolling line charts (joint angles, RULA/REBA scores, 12 sparklines) |
+| **Three.js** | r128 | Interactive 3D skeleton viewer at `/3d` |
+| **Font Awesome** | 6.0 | UI icons throughout the dashboard |
+| **Google Fonts** | — | Inter / JetBrains Mono typography |
+
+---
+
+### 🧠 AI / Machine Learning
+
+| Technology | Role |
+|---|---|
+| **ErgoNet v2.0** | Custom 4-head MLP (angle-based): risk score, severity, location code, condition code |
+| **NumPy MLP** | Dependency-free inference engine (NEON-optimised on ARM) — no TensorFlow/PyTorch needed |
+| **Synthetic Data Generator** | `ai/synthetic_gen.py` — high-fidelity TMS ergonomic dataset fabrication (20,000+ samples) |
+| **EMA Temporal Smoothing** | α=0.15 — 85% history weight, eliminates keypoint jitter at RULA scoring thresholds |
+| **Score Hysteresis** | Prevents RULA/REBA flickering across risk-level boundaries |
+| **Dropout Holdout** | Holds last-good angles for up to 6 missed frames (~0.75 s) during tracking loss |
+
+**ErgoNet v2.0 Architecture:**
+```
+Input (12 joint angles) → Dense(512, ReLU) → Dense(256, ReLU) → Dense(128, ReLU)
+→ 4 output heads:
+    risk_score     (continuous 0–10)
+    severity_code  (class 0–4: Healthy → Critical)
+    location_code  (class 0–8: body region)
+    condition_code (class 0–17: MSK condition)
+```
+
+**Training results:** Loss `0.2742` | Train Acc `97.14%` | Val Acc `94.22%`
+
+---
+
+### 📐 Biomechanics / Ergonomics Standards
+
+| Standard | Implementation |
+|---|---|
+| **RULA** (Rapid Upper Limb Assessment) | Full 7-level score via exact official lookup tables |
+| **REBA** (Rapid Entire Body Assessment) | Full 15-level score via exact official lookup tables |
+| **McAtamney & Corlett (1993)** | RULA methodology reference |
+| **Hignett & McAtamney (2000)** | REBA methodology reference |
+
+---
+
+### ⚙️ DevOps / Deployment
+
+| Technology | Role |
+|---|---|
+| **Bash** (`run.sh`) | Jetson startup script: nvpmodel MAXN, jetson_clocks, USB power management, log rotation |
+| **taskset** | CPU affinity pinning to cores 0–3 (Cortex-A78 big cores) |
+| **Git / GitHub** | Version control and remote repository |
+| **MJPEG over HTTP** | Video streaming endpoint (`/video_feed`, `/depth_feed`) at 8 fps |
 
 ---
 
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        OAK-D Camera(s)                          │
-│          RGB 1280×720 @ 30fps + Stereo Depth (aligned)          │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │  USB3 / XLink
-                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     camera/manager.py                           │
-│  • Non-blocking queues (size=1, device + host side)             │
-│  • tryGetAll() pattern → always freshest frame (no lag)         │
-│  • Depth post-processing: speckle, temporal, spatial filters    │
-└──────────┬──────────────────────┬───────────────────────────────┘
-           │                      │
-           ▼                      ▼
-┌──────────────────┐    ┌─────────────────────┐
-│  camera/         │    │  camera/             │
-│  imu_manager.py  │    │  calibration.py      │
-│  Visual IMU via  │    │  Intrinsics/extrinsics│
-│  Optical Flow    │    │  from OAK-D          │
-│  (LK sparse OF)  │    └─────────────────────┘
-└──────────┬───────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      pose/estimator.py                          │
-│         MediaPipe Pose → 33 body keypoints (x, y, z)            │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       pose/fusion.py                            │
-│   Multi-camera landmark fusion (average or triangulation)        │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      pose/skeleton.py                           │
-│  Joint angle computation: neck, trunk, upper/lower arm, wrist   │
-└──────────┬────────────────────────┬────────────────────────────┘
-           │                        │
-           ▼                        ▼
-┌─────────────────┐       ┌──────────────────┐
-│ ergonomics/     │       │ ergonomics/       │
-│ rula.py         │       │ reba.py           │
-│ RULA 1–7 score  │       │ REBA 1–15 score   │
-│ Group A+B table │       │ Group A+B table   │
-└────────┬────────┘       └────────┬──────────┘
-         └────────────┬────────────┘
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  web/socket_events.py                           │
-│   Background thread @ 10 Hz → emits pose_update via Socket.IO  │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Web Dashboard (Flask)                       │
-│   /dashboard  /camera  /rula  /reba  /3d                        │
-│   Real-time charts, 3D skeleton, video feed, IMU telemetry      │
-└─────────────────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌──────────────┐    ┌──────────────────────┐
-│ data/logger  │    │ reporting/            │
-│ CSV session  │    │ PDF report generator  │
-│ logging      │    │ + matplotlib graphs   │
-└──────────────┘    └──────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  OAK-D Camera (USB 2.0)                     │
+│         RGB 1280×720 + Stereo Depth aligned @ 8 fps         │
+└────────────────────────┬────────────────────────────────────┘
+                         │  DepthAI XLink
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  camera/manager.py  —  DepthAI Pipeline                     │
+│  • Non-blocking queues (size=1)  • tryGetAll() freshest     │
+│  • Depth: speckle + temporal + spatial + threshold filters  │
+│  • Simulation mode (MockCamera) when no OAK-D present       │
+└───────────────┬─────────────────────────────────────────────┘
+                │
+                ▼
+┌───────────────────────────┐
+│  pose/estimator.py        │  MediaPipe Pose → 33 keypoints
+│  pose/fusion.py           │  Multi-camera landmark merge
+│  pose/skeleton.py         │  3D vector maths → 30+ angles
+│  (3×3 median depth patch) │  EMA α=0.15 + dropout holdout
+└───────────────┬───────────┘
+                │
+       ┌────────┴────────┐
+       ▼                 ▼
+┌────────────┐   ┌────────────┐
+│ rula.py    │   │ reba.py    │
+│ Score 1–7  │   │ Score 1–15 │
+└────────────┘   └────────────┘
+       │                 │
+       └────────┬────────┘
+                ▼
+┌─────────────────────────────────────────────────────────────┐
+│  web/socket_events.py  — Background Thread @ ~8 Hz          │
+│  ai/operation/inference.py — ErgoNet v2.0 inference         │
+│  Emits: pose_update, skeleton_3d via Socket.IO              │
+└────────────────────────┬────────────────────────────────────┘
+                         │  WebSocket
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Flask Web Dashboard (web/routes.py)                        │
+│  ├── / dashboard    — Chart.js live charts + body map       │
+│  ├── /camera        — MJPEG video + depth feed              │
+│  ├── /rula          — RULA sub-score breakdown              │
+│  ├── /reba          — REBA sub-score breakdown              │
+│  ├── /3d            — Three.js 3D skeleton viewer           │
+│  ├── /ai            — ErgoNet training curves + inference   │
+│  ├── /collection    — CSV session recorder                  │
+│  └── /report        — PDF report generator                  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -126,18 +182,19 @@ The system runs on **NVIDIA Jetson Orin** (Ubuntu) or any Linux/Windows machine 
 
 | Feature | Details |
 |---|---|
-| 🎥 **Multi-camera support** | 1 to 3 OAK-D cameras auto-detected and fused |
-| 📐 **Depth-aligned RGB** | Stereo depth aligned to RGB frame; full post-processing pipeline |
-| 🦴 **MediaPipe Pose** | 33 body keypoints, real-time, no GPU required |
-| 📊 **RULA scoring** | Full 7-level risk score using exact official tables |
-| 📊 **REBA scoring** | Full 15-level risk score using exact official tables |
-| 🌀 **Visual IMU** | Roll/pitch/yaw from optical flow — no hardware IMU needed |
-| 🌐 **Live web dashboard** | Flask + Socket.IO, accessible from any browser on the network |
-| 🧠 **ErgoNet v2.0 Engine** | Angle-based MLP (12→512→4); **97.14% Train / 94.22% Val Accuracy** |
-| 🏥 **TMS Diagnostics** | 4-head output: risk score, severity (0–4), location code, condition code |
-| 📈 **AI Analytics Page** | `/ai` page with 500-epoch training curves and live inference monitor |
-| 🛡️ **Depth-Masking** | 0.5m–3.0m depth filter to ignore background people and noise |
-| ⚡ **Jetson Orin Ready** | ~8 ms inference (NumPy + OpenBLAS NEON) + non-blocking camera queues |
+| 🎥 **OAK-D Depth Camera** | RGB + stereo depth, aligned, post-processed |
+| 🦴 **MediaPipe Pose** | 33 body keypoints, CPU-only, real-time |
+| 📐 **Full RPY Angles** | Pitch, Roll, Yaw computed per joint (neck, trunk, elbow, wrist, thigh) |
+| 📊 **RULA / REBA** | Official lookup-table scoring, Groups A+B, sub-scores |
+| 🧠 **ErgoNet v2.0** | Angle-based MLP, 97.14% accuracy, 18 MSK condition classes |
+| 📈 **12 Live Sparklines** | Per-joint trend charts with live RPY numeric badges |
+| 🌀 **Visual IMU** | Roll/Pitch/Yaw from Lucas-Kanade optical flow |
+| 🌐 **Socket.IO Dashboard** | Real-time WebSocket streaming to any browser |
+| 🎬 **MJPEG Streams** | Live RGB + depth colourmap at 8 fps over HTTP |
+| 📄 **PDF Reports** | Automated ergonomic risk reports from CSV sessions |
+| ⚡ **Jetson Optimised** | CPU affinity, MAXN mode, non-blocking queues, 8 fps cap |
+| 🌙 **Dark / Light Mode** | Theme toggle with Chart.js theme sync |
+| 🔄 **Simulation Mode** | MockCamera when no OAK-D attached |
 
 ---
 
@@ -145,384 +202,194 @@ The system runs on **NVIDIA Jetson Orin** (Ubuntu) or any Linux/Windows machine 
 
 | Component | Minimum | Recommended |
 |---|---|---|
-| Camera | 1× OAK-D Lite | 1–3× OAK-D (with BNO086 IMU) |
-| Host CPU | 4-core ARM/x86 | NVIDIA Jetson Orin |
-| RAM | 4 GB | 8 GB+ |
-| USB | USB 3.0 | USB 3.1 Gen 2 |
-| OS | Ubuntu 20.04 | Ubuntu 22.04 / Windows 10+ |
-
-> **Note:** The Visual IMU works on all OAK-D variants including **OAK-D Lite** (which has no physical IMU chip).  
-> If your device has a **BNO086** IMU chip, you can re-enable hardware IMU in `camera/imu_manager.py`.
-
----
-
-## Software Requirements
-
-| Package | Version | Purpose |
-|---|---|---|
-| `depthai` | 2.24+ | OAK-D camera driver & pipeline |
-| `mediapipe` | 0.10+ | Human pose estimation |
-| `opencv-python` | 4.8+ | Image processing & optical flow |
-| `flask` | 3.0+ | Web server |
-| `flask-socketio` | 5.3+ | Real-time WebSocket communication |
-| `numpy` | 1.24+ | Numerical computing |
-| `pandas` | 2.0+ | Data logging & CSV export |
-| `matplotlib` | 3.7+ | Chart generation for PDF reports |
-| `reportlab` | 4.0+ | PDF report generation |
-| `simple-websocket` | — | WebSocket backend for Flask-SocketIO |
+| Camera | 1× OAK-D Lite | 1–3× OAK-D with BNO086 IMU |
+| Host | 4-core ARM/x86, 4 GB RAM | NVIDIA Jetson Orin, 8 GB RAM |
+| USB | USB 2.0 | USB 3.0 |
+| OS | Ubuntu 20.04 | Ubuntu 22.04 |
 
 ---
 
 ## Project Structure
 
 ```
-ergonomic-assessment-system/
-│
-├── app.py                      # Main entry point — orchestrates all modules
-├── config.py                   # Global configuration (FPS, paths, thresholds)
+ERGO-VISION/
+├── app.py                      # Entry point — orchestrates all modules
+├── config.py                   # Global config (FPS, paths, thresholds)
 ├── requirements.txt            # Python dependencies
-├── run.sh                      # Shell launcher script
-├── rula_text.txt               # Official RULA scoring tables (reference)
-├── reba_text.txt               # Official REBA scoring tables (reference)
+├── run.sh                      # Jetson startup script
 │
 ├── camera/
-│   ├── manager.py              # OAK-D RGB + Stereo Depth pipeline
-│   ├── imu_manager.py          # Visual IMU (optical flow — no hardware IMU)
-│   └── calibration.py         # Camera intrinsics / extrinsics
+│   ├── manager.py              # OAK-D DepthAI pipeline + MockCamera
+│   ├── imu_manager.py          # Visual IMU via Lucas-Kanade optical flow
+│   └── calibration.py          # RGB intrinsics / extrinsics
 │
 ├── pose/
 │   ├── estimator.py            # MediaPipe Pose → 33 landmarks
 │   ├── fusion.py               # Multi-camera landmark fusion
-│   └── skeleton.py             # Joint angle computation
+│   └── skeleton.py             # 3D joint angle computation (30+ keys)
 │
 ├── ergonomics/
-│   ├── rula.py                 # RULA calculator (Group A+B tables, score 1–7)
-│   ├── reba.py                 # REBA calculator (Group A+B tables, score 1–15)
-│   └── risk.py                 # Risk anomaly detector
-│
-├── web/
-│   ├── routes.py               # Flask routes (/dashboard, /camera, /rula, /reba, /3d)
-│   ├── socket_events.py        # Socket.IO event handlers + 10 Hz processing loop
-│   ├── mock_server.py          # Mock server for testing without camera
-│   ├── static/
-│   │   ├── css/style.css       # Dashboard stylesheet (glassmorphic dark theme)
-│   │   └── js/
-│   │       ├── dashboard.js    # Main dashboard Socket.IO client + charts
-│   │       └── 3d_viewer.js    # Three.js 3D skeleton viewer
-│   └── templates/
-│       ├── dashboard.html      # Main dashboard
-│       ├── camera.html         # Live camera feed + depth view
-│       ├── rula.html           # RULA detail page
-│       ├── reba.html           # REBA detail page
-│       └── 3d.html             # Interactive 3D skeleton view
+│   ├── rula.py                 # RULA calculator (score 1–7)
+│   ├── reba.py                 # REBA calculator (score 1–15)
+│   └── risk.py                 # Anomaly detector
 │
 ├── ai/
-│   ├── models/                 # ErgoNet v2.0 (.pkl) weights
-│   ├── data/                   # TMS enriched dataset + training history logs
-│   ├── operation/              # Inference engine, ONNX export, and TensorRT scripts
-│   ├── train_v2.py             # Version 2 training pipeline (angle-based)
-│   └── synthetic_gen.py        # High-fidelity ergonomic data generator
+│   ├── models/ergo_net_v2.pkl  # ErgoNet v2.0 weights
+│   ├── data/                   # TMS dataset + training logs
+│   ├── operation/              # Inference engine + ONNX export
+│   ├── train_v2.py             # Training pipeline
+│   └── synthetic_gen.py        # Synthetic data generator
+│
+├── web/
+│   ├── routes.py               # Flask routes
+│   ├── socket_events.py        # Socket.IO + processing thread
+│   ├── static/css/style.css    # Glassmorphic dark/light theme
+│   └── static/js/
+│       ├── dashboard.js        # Chart.js charts + Socket.IO client
+│       └── 3d_viewer.js        # Three.js 3D skeleton
+│   └── templates/              # Jinja2 HTML pages
 │
 ├── reporting/
-│   ├── report_generator.py     # PDF report builder
+│   ├── report_generator.py     # PDF builder (ReportLab)
 │   └── graphs.py               # Matplotlib chart helpers
 │
-└── ...
+└── docs/
+    ├── architecture.md
+    ├── dataset.md
+    ├── model_report.md
+    ├── jetson_optimization.md
+    └── onnx_guide.md
 ```
 
 ---
 
 ## Installation
 
-### 1. Clone the repository
-
 ```bash
+# 1. Clone
 git clone https://github.com/charrada1993/ERGO-VISION.git
 cd ERGO-VISION
-```
 
-2. **Initialize Environment**:
-```bash
-python3 -m venv venv
-source venv/bin/activate          # Linux / macOS
-# venv\Scripts\activate           # Windows
-```
+# 2. Create virtualenv
+python3 -m venv venv && source venv/bin/activate
 
-### 3. Install dependencies
-
-```bash
+# 3. Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
-```
 
-### 4. (Optional) Install DepthAI udev rules — Linux only
-
-```bash
+# 4. (Linux) OAK-D udev rules
 echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"' | \
   sudo tee /etc/udev/rules.d/80-movidius.rules
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
-
-### 5. Connect your OAK-D camera via USB 3.0
 
 ---
 
 ## Quick Start
 
 ```bash
-# Activate environment
-source venv/bin/activate
+# Option A — Jetson launcher (pins clocks, manages USB power)
+bash run.sh
 
-# Run the system
+# Option B — Direct Python
 python3 app.py
 ```
 
-Open your browser and navigate to:
+Open **http://localhost:5000** (or your Jetson IP on port 5000 from any device on the network).
 
-```
-http://localhost:5000/dashboard
-```
-
-### Available pages
-
-| URL | Description |
+| URL | Page |
 |---|---|
-| `/dashboard` | Main real-time dashboard with all metrics |
-| `/camera` | Live RGB + depth video feed |
-| `/rula` | RULA score breakdown (Group A, B, sub-scores) |
-| `/reba` | REBA score breakdown (Group A, B, sub-scores) |
-| `/3d` | Interactive Three.js 3D skeleton viewer |
-| `/collection` | **[NEW]** Data collection page (Start/Stop recording to CSV) |
-| `/report` | Report generation engine (CSV → PDF) |
-| `/ai` | **[NEW]** AI Model Analysis: Training curves & Live Inference log |
+| `/` | Main dashboard — live charts, body risk map, AI analysis |
+| `/camera` | RGB + depth MJPEG feed |
+| `/rula` | RULA sub-score breakdown |
+| `/reba` | REBA sub-score breakdown |
+| `/3d` | Three.js interactive 3D skeleton |
+| `/ai` | ErgoNet training curves + live inference monitor |
+| `/collection` | CSV session recorder |
+| `/report` | Automated PDF report generator |
 
 ---
 
-## Modules Documentation
+## Joint Angles Computed
 
-### Camera Manager
+`pose/skeleton.py` emits the following angle keys via `pose_update`:
 
-**File:** `camera/manager.py`
-
-Manages the OAK-D camera pipeline: RGB (1280×720 @ 30fps) and stereo depth (aligned to RGB).
-
-**Key design decisions:**
-- `xout.input.setBlocking(False)` + `xout.input.setQueueSize(1)` — eliminates device-side frame buildup
-- `tryGetAll()[-1]` pattern on host side — always processes the freshest frame
-- Depth post-processing: speckle filter, temporal filter, spatial filter (hole-filling), threshold filter (0.3–8 m)
-
-```python
-from camera.manager import CameraManager
-
-cam = CameraManager(pipeline=pipeline, device=device)
-cam.setup()          # Add nodes to pipeline (before device start)
-cam.start_streams()  # Open queues and start background thread
-
-frames = cam.get_latest_frames()
-# Returns: {'rgb': np.ndarray, 'depth': np.ndarray, 'disp': np.ndarray, 'timestamp': float}
-```
-
----
-
-### Visual IMU
-
-**File:** `camera/imu_manager.py`
-
-Derives orientation (roll, pitch, yaw) and pseudo-motion data from RGB camera optical flow. **No hardware IMU chip required** — works with OAK-D Lite.
-
-**Algorithm:**
-1. **Lucas-Kanade sparse optical flow** tracks up to 200 feature points between consecutive frames
-2. Mean flow vector → pseudo-accelerometer (ax, ay)
-3. Homography estimated from matched points → in-plane rotation → yaw
-4. Pitch and roll computed from the **exact reference formulas**:
-
-```
-Pitch (θ) = atan2(ax, √(ay² + az²)) × 180/π
-Roll  (φ) = atan2(ay, √(ax² + az²)) × 180/π
-Yaw   (ψ) = integrated from homography rotation angle
-```
-
-5. Exponential Moving Average (α=0.3) smooths all outputs
-
-```python
-from camera.imu_manager import IMUManager
-
-imu = IMUManager()
-imu.setup()
-imu.set_camera_manager(cam_mgr)
-imu.start()
-
-data = imu.get_data()
-# Returns: {'roll': float, 'pitch': float, 'yaw': float (degrees),
-#           'accel': (x, y, z), 'gyro': (x, y, z), 'euler': (roll, pitch, yaw)}
-```
-
----
-
-### Pose Estimation
-
-**File:** `pose/estimator.py`, `pose/fusion.py`, `pose/skeleton.py`
-
-- **PoseEstimator**: wraps MediaPipe Pose, returns 33×3 landmark array (normalized x, y, z)
-- **PoseFusion**: merges landmarks from multiple cameras (average or triangulation)
-- **SkeletonBuilder**: computes joint angles from landmark positions
-
-**Computed angles:**
-
-| Angle Key | Description |
+| Key | Description |
 |---|---|
-| `neck` | Neck flexion/extension (degrees) |
-| `trunk` | Trunk forward lean (degrees) |
-| `upper_arm_left/right` | Shoulder elevation (degrees) |
-| `elbow_left/right` | Elbow angle (degrees) |
-| `wrist_left/right` | Wrist flexion/deviation |
+| `neck` | Neck flexion/extension (Pitch) |
+| `neck_roll` | Head lateral tilt (Roll) |
+| `neck_yaw` | Head left/right rotation (Yaw) |
+| `trunk` | Trunk forward lean (Pitch) |
+| `trunk_roll` | Trunk lateral tilt (Roll) |
+| `trunk_yaw` | Trunk rotation — shoulder vs hip line (Yaw) |
+| `upper_arm_left/right` | Shoulder elevation |
+| `abd_l/r` | Shoulder abduction |
+| `elbow_left/right` | Elbow interior angle |
+| `elb_roll_l/r` | Forearm pronation/supination (Roll) |
+| `wrist_left/right` | Wrist flexion (Pitch) |
+| `wri_roll_l/r` | Wrist radial/ulnar deviation (Roll) |
+| `wri_yaw_l/r` | Wrist twist in transverse plane (Yaw) |
+| `hip_left/right` | Hip flexion |
+| `thi_roll_l/r` | Thigh abduction in frontal plane (Roll) |
+| `thi_yaw_l/r` | Hip internal rotation in horizontal plane (Yaw) |
+| `knee_left/right` | Knee flexion |
 
 ---
 
-### Ergonomic Scoring (RULA & REBA)
+## API Reference
 
-**Files:** `ergonomics/rula.py`, `ergonomics/reba.py`
+### Socket.IO Events (Server → Client)
 
-Both calculators implement the **exact official lookup tables** as documented in `rula_text.txt` and `reba_text.txt`.
+| Event | Description |
+|---|---|
+| `config` | `{mode, usb3}` — camera count and USB speed |
+| `pose_update` | Full posture payload at ~8 Hz |
+| `skeleton_3d` | `{landmarks: [[x,y,z]×33]}` for Three.js viewer |
 
-```python
-from ergonomics.rula import RULACalculator
-from ergonomics.reba import REBACalculator
-
-rula = RULACalculator()
-reba = REBACalculator()
-
-result = rula.compute(angles)
-# result['RULA_score']     → 1–7
-# result['risk_level']     → text label
-# result['score_A'], ['score_B'], ['score_C']
-# result['upper_arm_score'], ['lower_arm_score'], ['wrist_score'], ...
-
-result = reba.compute(angles)
-# result['REBA_score']     → 1–15
-# result['table_A'], ['table_B'], ['score_C']
-# result['trunk_score'], ['neck_score'], ['legs_score'], ...
+**`pose_update` payload:**
+```json
+{
+  "angles":       {"neck": 12.3, "neck_yaw": -5.1, "trunk": 8.2, ...},
+  "rula":         4,
+  "reba":         7,
+  "risk_level":   "Medium",
+  "anomalies":    ["Neck flexion: 42.0° (>40°)"],
+  "rula_details": {"score_a": 3, "score_b": 4, "score_c": 4},
+  "reba_details": {"table_a": 5, "table_b": 6, "score_c": 7},
+  "ai_results":   {"risk_score": 3.2, "severity_code": 2, "condition_code": 9}
+}
 ```
 
----
+### REST Endpoints
 
-### Web Dashboard
-
-**Files:** `web/routes.py`, `web/socket_events.py`
-
-- **Flask** serves all HTML pages
-- **Socket.IO** emits `pose_update` events at ~10 Hz with:
-  - Real-time charts, 3D skeleton, video feed, IMU telemetry
-  - **Joint Angle Trends:** 12 individual real-time charts tracking Neck, Trunk, Shoulder, Elbow, Wrist, and Knee angles
-  - RULA/REBA scores and sub-scores
-  - Risk level and anomaly list
-  - Visual IMU data (roll, pitch, yaw)
-- **Three.js** renders the 3D skeleton viewer at `/3d`
-
----
-
-### Data Logging & Reports
-
-**Files:** `data/logger.py`, `reporting/report_generator.py`
-
-- **Data Collection (`/collection`)**:
-  - Live stream with recording status indicators.
-  - Generates timestamped CSV files in `data_sessions/`.
-  - Logs: `timestamp`, `frame_id`, `joint_angles`, `RULA/REBA scores`, `anomalies`.
-- **Report Generation (`/report`)**:
-  - Automatically lists available recorded sessions.
-  - Generates comprehensive PDF reports in `reports/` including:
-    - **Executive Summary**: Mean/Peak risk levels.
-    - **Joint Statistics**: Min/Max/Mean/95th percentile analysis.
-    - **AI Insights**: Identification of critical joints and anomaly counts.
-    - **Visual Analytics**: Time-series graphs for risk and posture.
-    - **Clinical Recommendations**: Dynamic suggestions based on data.
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/config` | GET | Camera mode and hardware config |
+| `/api/sessions` | GET | List recorded CSV sessions |
+| `/api/reports` | GET | List generated PDF reports |
+| `/api/download_csv/<file>` | GET | Download a session CSV |
+| `/api/download_report/<file>` | GET | Download a PDF report |
+| `/api/generate_report/<file>` | GET | Generate PDF from CSV |
+| `/api/training_log` | GET | ErgoNet v2.0 training history JSON |
+| `/video_feed` | GET | MJPEG RGB stream (8 fps) |
+| `/depth_feed` | GET | MJPEG depth colourmap stream (4 fps) |
 
 ---
 
-## RULA Scoring Reference
+## RULA / REBA Scoring Reference
 
-### Group A — Upper Limb
+### RULA Final Score
 
-| Element | Range | Score |
+| Score | Risk | Action |
 |---|---|---|
-| **Upper arm** | Along body (0°) | 1 |
-| | < 20° elevation | 2 |
-| | 20°–45° | 2 |
-| | 45°–90° | 3 |
-| | > 90° | 4 |
-| | +rotation / +abduction | +1 each |
-| **Lower arm** | 60°–100° | 1 |
-| | < 60° or > 100° | 2 |
-| **Wrist** | 0°–15° | 1 |
-| | 15°–30° | 2 |
-| | > 30° | 3 |
-| | +lateral deviation | +1 |
-
-### Group B — Neck, Trunk, Legs
-
-| Element | Range | Score |
-|---|---|---|
-| **Neck** | 0°–10° | 1 |
-| | 10°–20° | 2 |
-| | > 20° | 3 |
-| | Extension | 4 |
-| | +rotation / +lateral tilt | +1 each |
-| **Trunk** | Upright (0°) | 1 |
-| | 0°–20° | 2 |
-| | 20°–60° | 3 |
-| | > 60° | 4 |
-| | Extension | 2 |
-| | +rotation / +lateral tilt | +1 each |
-| **Legs** | Stable | 1 |
-| | Unstable | 2 |
-
-### RULA Final Score Interpretation
-
-| Score | Risk Level | Action |
-|---|---|---|
-| 1–2 | ✅ Acceptable | No action required |
+| 1–2 | ✅ Acceptable | No action |
 | 3–4 | ⚠️ Low | Monitor |
 | 5–6 | 🔶 Medium | Change needed |
 | 7 | 🔴 Very High | Immediate action |
 
----
+### REBA Final Score
 
-## REBA Scoring Reference
-
-### Group A — Trunk, Neck, Legs
-
-| Element | Range | Score |
-|---|---|---|
-| **Trunk** | Upright (0°) | 1 |
-| | 0°–20° | 2 |
-| | 20°–60° | 3 |
-| | > 60° | 4 |
-| | Extension | 2 |
-| **Neck** | 0°–20° flexion | 1 |
-| | > 20° / extension | 2 |
-| **Legs** | Sitting / stable standing | 1 |
-| | One knee bent / uneven weight | 2 |
-| | Squatting / strongly bent knees | 3 |
-| | Very unstable / moving | 4 |
-
-### Group B — Upper Limb
-
-| Element | Range | Score |
-|---|---|---|
-| **Upper arm** | ≤ 20° | 1 |
-| | 20°–45° | 2 |
-| | 45°–90° | 3 |
-| | > 90° | 4 |
-| **Lower arm** | 60°–100° | 1 |
-| | < 60° or > 100° | 2 |
-| **Wrist** | Neutral | 1 |
-| | Flex/ext > 15° | 2 |
-| | +lateral deviation | +1 |
-
-### REBA Final Score Interpretation
-
-| Score | Risk Level | Action |
+| Score | Risk | Action |
 |---|---|---|
 | 1 | ✅ Negligible | No action |
 | 2–3 | ⚠️ Low | Monitor |
@@ -532,172 +399,64 @@ result = reba.compute(angles)
 
 ---
 
-## Visual IMU Formulas
-
-The Visual IMU module derives orientation from optical flow using standard inertial navigation formulas:
-
-```
-Pitch (θ) = atan2(ax,  √(ay² + az²)) × 180/π
-Roll  (φ) = atan2(ay,  √(ax² + az²)) × 180/π
-Yaw   (ψ) = ∫ ω_z dt   (integrated from in-plane homography rotation)
-```
-
-Where `ax`, `ay` are derived from the mean optical flow displacement vector scaled to pseudo-acceleration units, and `az = 0` (2D camera has no Z-axis flow).
-
-Smoothing is applied via **Exponential Moving Average** with α = 0.3:
-
-```
-value_smoothed = α × value_raw + (1 - α) × value_previous
-```
-
----
-
 ## Configuration
 
-Edit `config.py` to adjust system parameters:
+Edit `config.py`:
 
 ```python
 class Config:
-    MAX_CAMERAS      = 3       # Maximum OAK-D cameras (1–3)
-    PROCESSING_FPS   = 10      # Pose estimation frequency (Hz)
-    LOG_INTERVAL     = 0.5     # CSV logging interval (seconds)
+    MAX_CAMERAS      = 3      # Maximum OAK-D cameras
+    PROCESSING_FPS   = 10     # Pose estimation rate (Hz)
+    LOG_INTERVAL     = 0.5    # CSV logging interval (s)
+    LOAD_KG_DEFAULT  = 0      # Carried load (kg)
 
-    # Ergonomic defaults
-    LOAD_KG_DEFAULT     = 0    # Default carried load (kg)
-    REPETITIVE_DEFAULT  = False
-    PROLONGED_DEFAULT   = False
-    GRIP_QUALITY_DEFAULT = 0   # 0=good, 1=average, 2=poor
-```
-
-Camera-specific tuning in `camera/manager.py`:
-
-```python
-MONO_RESOLUTION = dai.MonoCameraProperties.SensorResolution.THE_720_P
-FPS             = 30           # Camera frame rate
-```
-
-Visual IMU tuning in `camera/imu_manager.py`:
-
-```python
-_LK_PARAMS = dict(winSize=(21, 21), maxLevel=3, ...)
-_REDETECT_INTERVAL = 10        # Re-detect features every N frames
-_EMA_ALPHA         = 0.3       # Smoothing factor (0=no change, 1=no smooth)
-_SCALE_ACCEL       = 0.02      # Flow px/frame → pseudo m/s²
-_SCALE_GYRO        = 0.5       # Rotation rad/frame → pseudo rad/s
-```
-
----
-
-## API Reference
-
-### Socket.IO Events
-
-#### Client → Server
-| Event | Payload | Description |
-|---|---|---|
-| `connect` | — | Client connects; server responds with `config` |
-
-#### Server → Client
-| Event | Payload | Description |
-|---|---|---|
-| `config` | `{mode: int, usb3: bool}` | Number of cameras and USB speed |
-| `pose_update` | See below | Real-time posture data at ~10 Hz |
-| `skeleton_3d` | `{landmarks: [[x,y,z]×33]}` | 33 body landmarks for 3D viewer |
-
-**`pose_update` payload:**
-```json
-{
-  "angles":       {"neck": 12.3, "trunk": 5.1, "upper_arm_left": 45.2, ...},
-  "rula":         4,
-  "reba":         7,
-  "risk_level":   "Moyen – Changement nécessaire",
-  "anomalies":    ["Neck flexion: 42.0° (>40°)"],
-  "rula_details": {"score_a": 3, "score_b": 4, "score_c": 4, ...},
-  "reba_details": {"table_a": 5, "table_b": 6, "score_c": 7, ...},
-  "imu": {
-    "roll":  2.5,
-    "pitch": -1.2,
-    "yaw":   15.0,
-    "accel": {"x": 0.001, "y": -0.002, "z": 0.0},
-    "gyro":  {"x": 0.0, "y": 0.0, "z": 0.003}
-  }
-}
+class JetsonConfig:
+    VIDEO_WIDTH      = 320    # MJPEG stream width
+    VIDEO_HEIGHT     = 240    # MJPEG stream height
+    VIDEO_STREAM_FPS = 8      # MJPEG FPS cap
+    VIDEO_JPEG_QUALITY = 50   # JPEG quality (0–100)
 ```
 
 ---
 
 ## Troubleshooting
 
-### No OAK-D device found
-```
-[Main] No OAK-D device found. Exiting.
-```
-- Ensure the camera is connected via **USB 3.0** (not USB 2.0 — the cable matters)
-- On Linux: install udev rules (see Installation step 4)
-- Try `lsusb | grep 03e7` to confirm the device is detected by the OS
-
-### Camera lag / stuttering
-- Already fixed: the system uses `tryGetAll()[-1]` + `setQueueSize(1)` on both device and host
-- If still laggy: reduce `FPS` in `manager.py` from 30 to 15
-
-### Pipeline failed for device
-```
-[Main] Pipeline start failed for device XXXX: ...
-```
-- Disconnect and reconnect the camera
-- Try a different USB port or cable
-- Ensure no other application is using the camera
-
-### Visual IMU shows zeros
-- The IMU starts tracking after the first two frames; wait 1–2 seconds
-- Ensure the camera is not completely static (no features to track)
-- The IMU requires `set_camera_manager()` to be called before `start()`
-
-### MediaPipe no landmarks detected
-```
-[Processing] No landmarks detected from any camera
-```
-- Ensure the subject is fully visible in the camera frame
-- Improve lighting conditions
-- Reduce `model_complexity` in `pose/estimator.py` from `1` to `0` for faster detection
-
-### PDF report not generated
-- Check that `reports/` directory is writable
-- Ensure `reportlab` and `matplotlib` are installed: `pip install reportlab matplotlib`
+| Problem | Solution |
+|---|---|
+| `No OAK-D device found` | Check USB, run `lsusb \| grep 03e7`, install udev rules |
+| `Port 5000 already in use` | Run `fuser -k 5000/tcp` then restart |
+| Charts blank / no data | Check browser console for JS errors; ensure camera is connected |
+| Blank video feed | Camera in simulation mode — connect OAK-D |
+| PDF not generated | Ensure `reports/` is writable; `pip install reportlab matplotlib` |
+| MediaPipe no landmarks | Improve lighting; subject must be fully visible in frame |
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please follow these steps:
-
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m "Add your feature"`
-4. Push to the branch: `git push origin feature/your-feature`
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Commit: `git commit -m "feat: your feature"`
+4. Push: `git push origin feature/your-feature`
 5. Open a Pull Request
-
-### Code Style
-- Follow PEP 8
-- Add docstrings to all new methods
-- Use the existing module structure (camera / pose / ergonomics / web / data)
-- Reference official DepthAI examples in `examples/` for any camera-related changes
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+**MIT License** — see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Acknowledgements
 
-- [Luxonis DepthAI](https://docs.luxonis.com/) — OAK-D camera SDK and examples
+- [Luxonis DepthAI](https://docs.luxonis.com/) — OAK-D camera SDK
 - [Google MediaPipe](https://developers.google.com/mediapipe) — Human pose estimation
-- [McAtamney & Corlett (1993)](https://doi.org/10.1080/00140139308967424) — RULA methodology
-- [Hignett & McAtamney (2000)](https://doi.org/10.1016/S0003-6870(99)00044-1) — REBA methodology
+- [Chart.js](https://www.chartjs.org/) — Real-time data visualization
+- [Three.js](https://threejs.org/) — 3D skeleton viewer
+- McAtamney & Corlett (1993) — RULA methodology
+- Hignett & McAtamney (2000) — REBA methodology
 
 ---
 
-*Built with ❤️ for occupational health and safety.*
+*Built with ❤️ for occupational health and safety on NVIDIA Jetson Orin.*
