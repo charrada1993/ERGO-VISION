@@ -1,6 +1,6 @@
 # AI Operation: Inference-Only Engine
 
-*Last updated: 2026-05-11*
+*Last updated: 2026-05-30 — Integrated with real-time joint angles visualization*
 
 This folder contains the **Operational AI** engine — the version of ErgoNet v2.0 used in the live dashboard. Unlike the training scripts, this code cannot learn or change. It is designed for **reliability, speed, and zero-dependency stability**.
 

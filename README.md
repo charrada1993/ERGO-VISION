@@ -2,7 +2,7 @@
 
 > **Real-time ergonomic posture assessment system** powered by OAK-D depth cameras, MediaPipe pose estimation, and **ErgoNet v2.0 Neural Engine** — trained to **97.14% accuracy** on 20,000+ TMS samples for clinical-grade musculoskeletal diagnostics.
 
-*Last updated: 2026-05-29 — Full RPY joint angle computation + live dashboard chart fix*
+*Last updated: 2026-05-30 — Added RPY joint inputs to AI page & compiled [tech.md](tech.md)*
 
 ---
 
@@ -27,11 +27,14 @@
 
 ## Overview
 
-**ERGO-VISION** is a fully open-source, real-time ergonomic risk assessment platform for industrial and occupational health environments. It uses OAK-D depth cameras to capture synchronized RGB + stereo depth streams, runs MediaPipe pose estimation, computes 30+ joint angles (including full Roll/Pitch/Yaw per joint), and streams everything to a live web dashboard with Chart.js real-time sparklines.
+**ERGO-VISION** is a fully open-source, real-time ergonomic risk assessment platform for occupational health. For a full breakdown of the software and hardware dependencies, see [tech.md](tech.md).
 
 ---
 
 ## Technology Stack
+
+> [!NOTE]
+> For a comprehensive breakdown of all libraries, hardware integration, and software versions, refer to the dedicated [Technology Stack Documentation (tech.md)](tech.md).
 
 ### 🖥️ Hardware Platform
 
@@ -202,7 +205,7 @@ Input (12 joint angles) → Dense(512, ReLU) → Dense(256, ReLU) → Dense(128,
 
 | Component | Minimum | Recommended |
 |---|---|---|
-| Camera | 1× OAK-D Lite | 1–3× OAK-D with BNO086 IMU |
+| Camera | 1× OAK-D Lite | 1–3× OAK-D (Visual IMU computed via optical flow) |
 | Host | 4-core ARM/x86, 4 GB RAM | NVIDIA Jetson Orin, 8 GB RAM |
 | USB | USB 2.0 | USB 3.0 |
 | OS | Ubuntu 20.04 | Ubuntu 22.04 |

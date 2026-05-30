@@ -437,7 +437,62 @@
           </div>
         </div>
 
-
+        <!-- Real-time Joint Angles -->
+        <div class="card" style="padding:1.5rem;">
+          <div class="panel-header" style="margin-bottom:1rem;">
+            <div class="panel-title"><i class="fas fa-joint" style="color:var(--cyan)"></i> Real-time Joint Inputs</div>
+          </div>
+          <div class="joint-strip">
+            <div class="joint-chip">
+              <div class="jc-label">Neck</div>
+              <div class="jc-val" id="ji-neck">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">Trunk</div>
+              <div class="jc-val" id="ji-trunk">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">L Shoulder</div>
+              <div class="jc-val" id="ji-shl-l">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">R Shoulder</div>
+              <div class="jc-val" id="ji-shl-r">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">L Elbow</div>
+              <div class="jc-val" id="ji-elb-l">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">R Elbow</div>
+              <div class="jc-val" id="ji-elb-r">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">L Wrist</div>
+              <div class="jc-val" id="ji-wri-l">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">R Wrist</div>
+              <div class="jc-val" id="ji-wri-r">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">L Hip</div>
+              <div class="jc-val" id="ji-hip-l">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">R Hip</div>
+              <div class="jc-val" id="ji-hip-r">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">L Knee</div>
+              <div class="jc-val" id="ji-kne-l">--</div>
+            </div>
+            <div class="joint-chip">
+              <div class="jc-label">R Knee</div>
+              <div class="jc-val" id="ji-kne-r">--</div>
+            </div>
+          </div>
+        </div>
 
         <!-- Model info strip -->
         <div class="card" style="padding:1.2rem;">
@@ -563,19 +618,19 @@
       const a = data.angles || {};
       const ai = data.ai_results;
 
-      // Joint inputs
-      $('ji-neck').textContent = fmt(a.neck) + '°';
-      $('ji-trunk').textContent = fmt(a.trunk) + '°';
-      $('ji-shl-l').textContent = fmt(a.upper_arm_left) + '°';
-      $('ji-shl-r').textContent = fmt(a.upper_arm_right) + '°';
-      $('ji-elb-l').textContent = fmt(a.elbow_left) + '°';
-      $('ji-elb-r').textContent = fmt(a.elbow_right) + '°';
-      $('ji-wri-l').textContent = fmt(a.wrist_left) + '°';
-      $('ji-wri-r').textContent = fmt(a.wrist_right) + '°';
-      $('ji-hip-l').textContent = fmt(a.hip_left) + '°';
-      $('ji-hip-r').textContent = fmt(a.hip_right) + '°';
-      $('ji-kne-l').textContent = fmt(a.knee_left) + '°';
-      $('ji-kne-r').textContent = fmt(a.knee_right) + '°';
+      // Joint inputs (with defensive DOM checks)
+      if ($('ji-neck')) $('ji-neck').textContent = fmt(a.neck) + '°';
+      if ($('ji-trunk')) $('ji-trunk').textContent = fmt(a.trunk) + '°';
+      if ($('ji-shl-l')) $('ji-shl-l').textContent = fmt(a.upper_arm_left) + '°';
+      if ($('ji-shl-r')) $('ji-shl-r').textContent = fmt(a.upper_arm_right) + '°';
+      if ($('ji-elb-l')) $('ji-elb-l').textContent = fmt(a.elbow_left) + '°';
+      if ($('ji-elb-r')) $('ji-elb-r').textContent = fmt(a.elbow_right) + '°';
+      if ($('ji-wri-l')) $('ji-wri-l').textContent = fmt(a.wrist_left) + '°';
+      if ($('ji-wri-r')) $('ji-wri-r').textContent = fmt(a.wrist_right) + '°';
+      if ($('ji-hip-l')) $('ji-hip-l').textContent = fmt(a.hip_left) + '°';
+      if ($('ji-hip-r')) $('ji-hip-r').textContent = fmt(a.hip_right) + '°';
+      if ($('ji-kne-l')) $('ji-kne-l').textContent = fmt(a.knee_left) + '°';
+      if ($('ji-kne-r')) $('ji-kne-r').textContent = fmt(a.knee_right) + '°';
 
       if (!ai) return;
 

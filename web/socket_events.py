@@ -176,59 +176,87 @@ class SocketEvents:
                 else:
                     masked_small_rgb = small_rgb
 
-                # ── 3. Pose estimation ─────────────────────────────────
-                # Run on the FULL rgb frame so MediaPipe visibility scores are accurate;
-                # the internal estimator already downsizes to 320x180.
-                results_raw = self.pose_est._run_raw(rgb) if hasattr(self.pose_est, '_run_raw') else None
-                lm = self.pose_est.get_landmarks(masked_small_rgb)
-                if lm is None:
-                    # ── Dropout path: hold last good scores for up to _MAX_DROPOUT ──
-                    hold = self.skeleton.enrich_with_depth({})   # returns holdout or {}
-                    if hold and _rula_committed is not None:
-                        # Re-emit with last committed scores so UI doesn't flash '--'
-                        now2 = time.time()
-                        if now2 - last_emit >= _min_emit_dt:
-                            self.socketio.emit('pose_update', _sanitize({
-                                'angles':       _last_angles,
-                                'rula':         _rula_committed,
-                                'reba':         _reba_committed,
-                                'risk_level':   _risk_committed,
-                                'anomalies':    _last_anomalies,
-                                'rula_details': _rula_details_committed,
-                                'reba_details': _reba_details_committed,
-                                'imu':          self._imu_cache,
-                                'ai_results':   None,
-                                '_holdout':     True,
-                            }))
-                            last_emit = now2
-                    else:
-                        if now - last_status_msg >= _STATUS_DT:
-                            print("[Processing] No person detected in frame")
-                            last_status_msg = now
-                    time.sleep(0.020)
-                    continue
+                # ── 3. Pose estimation & dynamic mock fallback ────────
+                from camera.mock_manager import MockCameraManager
+                is_mock = isinstance(mgr, MockCameraManager)
 
-                self._frame_count += 1
+                if is_mock:
+                    # Generate dynamic, realistic synthetic joint angles
+                    t = time.time()
+                    angles = {
+                        'neck':            15.0 + math.sin(t) * 10.0,
+                        'trunk':           20.0 + math.cos(t * 0.8) * 15.0,
+                        'upper_arm_left':  45.0 + math.sin(t * 1.2) * 25.0,
+                        'upper_arm_right': 30.0 + math.cos(t * 1.5) * 20.0,
+                        'elbow_left':      90.0 + math.sin(t * 0.9) * 30.0,
+                        'elbow_right':     80.0 + math.cos(t * 1.1) * 25.0,
+                        'wrist_left':      10.0 + math.sin(t * 1.4) * 15.0,
+                        'wrist_right':     12.0 + math.cos(t * 1.3) * 12.0,
+                        'hip_left':        15.0 + math.sin(t * 0.5) * 5.0,
+                        'hip_right':       15.0 + math.cos(t * 0.5) * 5.0,
+                        'knee_left':       5.0 + math.sin(t * 0.7) * 5.0,
+                        'knee_right':      5.0 + math.cos(t * 0.7) * 5.0,
+                    }
+                    lm = np.zeros((33, 3), dtype=np.float32)
+                    for i in range(33):
+                        lm[i] = [0.5 + 0.1 * math.sin(t + i), 0.5 + 0.1 * math.cos(t + i), 0.0]
+                    
+                    skeleton_3d = np.zeros((33, 3), dtype=np.float32)
+                    for i in range(33):
+                        skeleton_3d[i] = [0.0, 0.0, 1.5]
+                    
+                    self._frame_count += 1
+                else:
+                    results_raw = self.pose_est._run_raw(rgb) if hasattr(self.pose_est, '_run_raw') else None
+                    lm = self.pose_est.get_landmarks(masked_small_rgb)
+                    if lm is None:
+                        # ── Dropout path: hold last good scores for up to _MAX_DROPOUT ──
+                        hold = self.skeleton.enrich_with_depth({})   # returns holdout or {}
+                        if hold and _rula_committed is not None:
+                            # Re-emit with last committed scores so UI doesn't flash '--'
+                            now2 = time.time()
+                            if now2 - last_emit >= _min_emit_dt:
+                                self.socketio.emit('pose_update', _sanitize({
+                                    'angles':       _last_angles,
+                                    'rula':         _rula_committed,
+                                    'reba':         _reba_committed,
+                                    'risk_level':   _risk_committed,
+                                    'anomalies':    _last_anomalies,
+                                    'rula_details': _rula_details_committed,
+                                    'reba_details': _reba_details_committed,
+                                    'imu':          self._imu_cache,
+                                    'ai_results':   None,
+                                    '_holdout':     True,
+                                }))
+                                last_emit = now2
+                        else:
+                            if now - last_status_msg >= _STATUS_DT:
+                                print("[Processing] No person detected in frame")
+                                last_status_msg = now
+                        time.sleep(0.020)
+                        continue
 
-                # ── 4. Fuse + compute angles ──────────────────────────
-                skeleton_3d = self.pose_fusion.fuse([lm])
-                if skeleton_3d is None:
-                    continue
+                    self._frame_count += 1
 
-                # ── 5. RULA + REBA — pass depth + calib so 3D pipeline is active ──
-                calib = self.app.config.get('CALIBRATION')
-                frame_h, frame_w = rgb.shape[:2]
-                angles = self.skeleton.compute_angles(
-                    skeleton_3d,
-                    calib=calib,
-                    depth_frame=depth_frame,   # uint16 mm, aligned to RGB
-                    world_landmarks=None,       # fallback handled inside compute_angles
-                    frame_w=frame_w,
-                    frame_h=frame_h,
-                )
+                    # ── 4. Fuse + compute angles ──────────────────────────
+                    skeleton_3d = self.pose_fusion.fuse([lm])
+                    if skeleton_3d is None:
+                        continue
 
-                # EMA smoothing pass
-                angles = self.skeleton.enrich_with_depth(angles)
+                    # ── 5. RULA + REBA — pass depth + calib so 3D pipeline is active ──
+                    calib = self.app.config.get('CALIBRATION')
+                    frame_h, frame_w = rgb.shape[:2]
+                    angles = self.skeleton.compute_angles(
+                        skeleton_3d,
+                        calib=calib,
+                        depth_frame=depth_frame,   # uint16 mm, aligned to RGB
+                        world_landmarks=None,       # fallback handled inside compute_angles
+                        frame_w=frame_w,
+                        frame_h=frame_h,
+                    )
+
+                    # EMA smoothing pass
+                    angles = self.skeleton.enrich_with_depth(angles)
 
                 rula_res = self.rula_calc.compute(angles)
                 reba_res = self.reba_calc.compute(angles)

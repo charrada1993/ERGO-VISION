@@ -1,6 +1,6 @@
 # AI Evaluation & Results — ErgoNet v2.0
 
-*Last updated: 2026-05-11 — Post training run (500 epochs, `dataset_TMS_enriched.csv`)*
+*Last updated: 2026-05-30 — Post training run (500 epochs, dataset_TMS_enriched.csv)*
 
 ---
 
