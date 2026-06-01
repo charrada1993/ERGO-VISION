@@ -46,6 +46,8 @@ web/static/temp_plot.png
 Thumbs.db
 # Project specific
 backend.log
+*.log
+*.log.bak
 .cache/
 ai/data/
 ai/models/
