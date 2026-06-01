@@ -2,7 +2,7 @@
 
 > **Real-time ergonomic posture assessment system** powered by OAK-D depth cameras, MediaPipe pose estimation, and **ErgoNet v2.0 Neural Engine** — trained to **97.14% accuracy** on 20,000+ TMS samples for clinical-grade musculoskeletal diagnostics.
 
-*Last updated: 2026-05-30 — Added RPY joint inputs to AI page & compiled [tech.md](tech.md)*
+*Last updated: 2026-06-01 — Added [Jury Defense Q&A Guide](JURY_QUESTIONS_ANSWERS.md) for final project presentation.*
 
 ---
 
@@ -21,7 +21,9 @@
 11. [RULA / REBA Scoring Reference](#rula--reba-scoring-reference)
 12. [Configuration](#configuration)
 13. [Troubleshooting](#troubleshooting)
-14. [Contributing](#contributing)
+14. [Jury Defense & Technical Q&A Guide](JURY_QUESTIONS_ANSWERS.md)
+15. [Contributing](#contributing)
+
 
 ---
 
@@ -432,6 +434,20 @@ class JetsonConfig:
 | Blank video feed | Camera in simulation mode — connect OAK-D |
 | PDF not generated | Ensure `reports/` is writable; `pip install reportlab matplotlib` |
 | MediaPipe no landmarks | Improve lighting; subject must be fully visible in frame |
+
+---
+
+## 🎓 Jury Defense & Technical Q&A Guide
+
+To prepare for your final academic or professional jury defense, refer to the compiled:
+👉 **[JURY_QUESTIONS_ANSWERS.md](JURY_QUESTIONS_ANSWERS.md)**
+
+This comprehensive guide includes expert-level questions and detailed answers regarding:
+* Embedded optimizations on Jetson Orin (`nvpmodel`, `jetson_clocks`, `taskset` affinity).
+* 3D stereoscopic depth alignment & MediaPipe noise filtration.
+* Biomechanical angle math & official RULA/REBA table implementations.
+* Custom AI Engine (**ErgoNet v2.0**) structure & pure NumPy forward pass.
+* System trade-offs and future product scalability.
 
 ---
 

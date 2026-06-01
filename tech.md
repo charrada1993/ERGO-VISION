@@ -96,3 +96,9 @@ To achieve a stable 8+ FPS pipeline on the Jetson Orin CPU:
 - **`run.sh` Bash Automation**: Sets Jetson Power Mode to `MAXN` high-performance, runs `jetson_clocks` to lock CPU/GPU frequencies, disables USB autosuspend, and rotates log files.
 - **`taskset` CPU Pinning**: Binds the critical real-time frame processing loop to CPU cores 0–3 (the A78AE big cores) to prevent scheduler context switching.
 - **Log Rotation**: Limits log sizes to prevent disk overflow on edge installations.
+
+---
+
+## 🎓 Jury Defense Prep
+For a comprehensive set of master-level questions and answers prepared specifically for your final project defense, see the **[Jury Q&A Defense Guide](JURY_QUESTIONS_ANSWERS.md)**.
+

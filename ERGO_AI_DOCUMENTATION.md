@@ -79,4 +79,10 @@ For deeper technical explanations, see the `docs/` folder:
 
 ---
 
+## 🎓 Jury Defense Prep
+For master-level questions and answers regarding ErgoNet v2.0 AI architecture, custom NumPy inference, synthetic bootstrap dataset generation, and more, see the **[Jury Q&A Defense Guide](JURY_QUESTIONS_ANSWERS.md)**.
+
+---
+
 *Documented by ErgoVision AI Team · 2026*
+
