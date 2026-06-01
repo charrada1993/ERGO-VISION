@@ -96,9 +96,9 @@ class NumpyInference:
             elif col == 'severity_code':
                 val = float(np.clip(round(val), 0, 4))
             elif col == 'location_code':
-                val = float(np.clip(round(val), 0, 20))
+                val = float(np.clip(round(val), 0, 9))
             elif col == 'condition_code':
-                val = float(np.clip(round(val), 0, 20))
+                val = float(np.clip(round(val), 0, 17))
             results[col] = val
             
         return results

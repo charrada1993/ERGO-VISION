@@ -171,7 +171,15 @@ class CameraManager:
         over USB 2.0 where latency spikes are common.
         Poll at 20 ms (50 Hz) so a new frame (arriving at 8 Hz = every 125 ms)
         is picked up within 20 ms of arrival instead of up to 125 ms.
+
+        Error handling: exponential backoff (0.5s → 5s) on repeated XLink errors.
+        Error message is rate-limited to once per 10 s to avoid log flooding.
         """
+        _err_backoff    = 0.5     # initial sleep on error (seconds)
+        _err_backoff_max = 5.0   # maximum backoff cap
+        _last_err_print = 0.0    # timestamp of last printed error
+        _ERR_PRINT_DT   = 10.0  # only print error once per 10 s
+
         while self.running:
             try:
                 # 1. RGB
@@ -195,12 +203,22 @@ class CameraManager:
                     with self._lock:
                         self.frame_disp = pkt.getFrame()    # uint8 disparity
 
+                # Successful read – reset backoff
+                _err_backoff = 0.5
+
                 # Poll at 20 ms – fast enough to catch 8-fps frames within 20 ms
                 time.sleep(0.020)
 
             except Exception as e:
                 if self.running:
-                    print(f"[Camera] Reader error: {e}")
+                    _now = time.time()
+                    # Rate-limit: only log once per 10 s to avoid XLink error storms
+                    if _now - _last_err_print >= _ERR_PRINT_DT:
+                        print(f"[Camera] Reader error (backoff {_err_backoff:.1f}s): {e}")
+                        _last_err_print = _now
+                    # Exponential backoff – prevents 50 log writes/sec on disconnect
+                    time.sleep(_err_backoff)
+                    _err_backoff = min(_err_backoff * 2, _err_backoff_max)
 
     # ------------------------------------------------------------------
     # Public accessors

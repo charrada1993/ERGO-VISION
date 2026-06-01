@@ -207,7 +207,6 @@ class SocketEvents:
                     
                     self._frame_count += 1
                 else:
-                    results_raw = self.pose_est._run_raw(rgb) if hasattr(self.pose_est, '_run_raw') else None
                     lm = self.pose_est.get_landmarks(masked_small_rgb)
                     if lm is None:
                         # ── Dropout path: hold last good scores for up to _MAX_DROPOUT ──
@@ -321,11 +320,7 @@ class SocketEvents:
                         else:
                             ai_results = self.ai_model.predict(lm)
                     except Exception as e:
-                        # Fallback for version check if attribute is missing
-                        try:
-                            ai_results = self.ai_model.predict(lm)
-                        except:
-                            pass
+                        print(f"[AI] Inference error: {e}")
 
                 # ── 6. Anomaly detection ──────────────────────────────
                 anomalies = []

@@ -279,15 +279,15 @@ class REBACalculator:
     @staticmethod
     def interpret(score):
         """
-        Tableau d'interprétation (Section IV, reba_text.txt):
-          1         → Négligeable
-          2–3       → Faible
-          4–7       → Moyen – Amélioration nécessaire
-          8–10      → Élevé – Intervention rapide
-          11–15     → Très élevé – Action immédiate
+        Interpretation Table (Section IV):
+          1         → Negligible
+          2–3       → Low - Monitor
+          4–7       → Medium - Change required
+          8–10      → High - Rapid intervention
+          11–15     → Very High - Immediate action
         """
-        if score <= 1:    return "Négligeable"
-        elif score <= 3:  return "Faible – Surveiller"
-        elif score <= 7:  return "Moyen – Amélioration nécessaire"
-        elif score <= 10: return "Élevé – Intervention rapide"
-        else:             return "Très élevé – Action immédiate"
+        if score <= 1:    return "Negligible"
+        elif score <= 3:  return "Low - Monitor"
+        elif score <= 7:  return "Medium - Change required"
+        elif score <= 10: return "High - Rapid intervention"
+        else:             return "Very High - Immediate action"

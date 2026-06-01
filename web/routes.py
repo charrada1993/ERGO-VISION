@@ -16,7 +16,7 @@ def create_app():
         template_folder=os.path.join(Config.BASE_DIR, 'web', 'templates'),
         static_folder=os.path.join(Config.BASE_DIR, 'web', 'static')
     )
-    app.config['SECRET_KEY'] = 'ergosecret!'
+    app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET', 'ergosecret!')
     socketio = SocketIO(
         app,
         cors_allowed_origins="*",
@@ -24,6 +24,11 @@ def create_app():
         logger=False,           # disable verbose SocketIO logs (CPU saving)
         engineio_logger=False,
     )
+
+    # Silence favicon 404 spam
+    @app.route('/favicon.ico')
+    def favicon():
+        return '', 204
 
     # Page routes
     @app.route('/')

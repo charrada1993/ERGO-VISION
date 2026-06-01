@@ -276,13 +276,13 @@ class RULACalculator:
     @staticmethod
     def interpret(score):
         """
-        Tableau d'interprétation (Section III, rula_text.txt):
+        Interpretation Table (Section III):
           1-2 → Acceptable
-          3-4 → Faible / Surveillance
-          5-6 → Moyen / Changement nécessaire
-          7   → Très élevé / Action immédiate
+          3-4 → Low - Monitoring
+          5-6 → Medium - Change required
+          7   → Very High - Immediate action
         """
         if score <= 2:   return "Acceptable"
-        elif score <= 4: return "Faible – Surveillance"
-        elif score <= 6: return "Moyen – Changement nécessaire"
-        else:            return "Très élevé – Action immédiate"
+        elif score <= 4: return "Low - Monitoring"
+        elif score <= 6: return "Medium - Change required"
+        else:            return "Very High - Immediate action"

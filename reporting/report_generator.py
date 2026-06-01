@@ -1,5 +1,6 @@
 # reporting/report_generator.py
 import os
+import tempfile
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
@@ -214,107 +215,114 @@ class ReportGenerator:
         # 6. RISK DISTRIBUTION (Visuals)
         story.append(Paragraph("4. Risk Distribution & Temporal Trends", h2_style))
         
-        os.makedirs(Config.STATIC_DIR, exist_ok=True)
-        # Pie Chart: Risk Level Distribution
-        risk_counts = df['risk_prediction'].value_counts()
-        plt.figure(figsize=(5, 5))
-        plt.pie(risk_counts, labels=risk_counts.index, autopct='%1.1f%%', colors=['#00e5a0', '#ffc94d', '#ff4d6d', '#ff7c3e'], startangle=140)
-        plt.title('Kinematic State Distribution')
-        pie_path = os.path.join(Config.STATIC_DIR, f"temp_pie_{datetime.now().timestamp()}.png")
-        plt.savefig(pie_path, transparent=True)
-        plt.close()
-        
-        # Time Series: RULA/REBA/AI
-        plt.figure(figsize=(8, 3.5))
-        plt.plot(df['timestamp'], df['RULA_score'], color='#00d4ff', label='RULA (Upper)', linewidth=1.0, alpha=0.5)
-        plt.plot(df['timestamp'], df['REBA_score'], color='#9b59ff', label='REBA (Full)', linewidth=1.0, alpha=0.5)
-        if 'ai_risk_score' in df.columns:
-            plt.plot(df['timestamp'], df['ai_risk_score'], color='#ff4d6d', label='Ergo-Net MSK Index', linewidth=2.0)
-            plt.fill_between(df['timestamp'], df['ai_risk_score'], color='#ff4d6d', alpha=0.1)
-            
-        plt.axhline(y=5, color='orange', linestyle='--', alpha=0.5, label='Concern Threshold')
-        plt.xlabel('Time (seconds)')
-        plt.ylabel('Clinical Score')
-        plt.title('Biomechanical Strain Over Time')
-        plt.legend(loc='upper right', fontsize='small', ncol=3)
-        plt.grid(True, which='both', linestyle='--', alpha=0.3)
-        timeline_path = os.path.join(Config.STATIC_DIR, f"temp_time_{datetime.now().timestamp()}.png")
-        plt.savefig(timeline_path)
-        plt.close()
+        os.makedirs(Config.REPORT_DIR, exist_ok=True)
+        # Use /tmp for temp images — avoids polluting web/static/ and races
+        pie_fd,  pie_path  = tempfile.mkstemp(suffix='.png', prefix='ergo_pie_')
+        time_fd, timeline_path = tempfile.mkstemp(suffix='.png', prefix='ergo_time_')
+        os.close(pie_fd)
+        os.close(time_fd)
+        try:
+            # Pie Chart: Risk Level Distribution
+            risk_counts = df['risk_prediction'].value_counts() if 'risk_prediction' in df.columns else None
+            if risk_counts is not None and not risk_counts.empty:
+                plt.figure(figsize=(5, 5))
+                plt.pie(risk_counts, labels=risk_counts.index, autopct='%1.1f%%',
+                        colors=['#00e5a0', '#ffc94d', '#ff4d6d', '#ff7c3e'], startangle=140)
+                plt.title('Kinematic State Distribution')
+                plt.savefig(pie_path, transparent=True)
+                plt.close()
+            else:
+                plt.figure(figsize=(5, 5))
+                plt.text(0.5, 0.5, 'No risk data', ha='center', va='center')
+                plt.savefig(pie_path, transparent=True)
+                plt.close()
 
-        v_data = [[Image(pie_path, width=2.8*inch, height=2.8*inch), Image(timeline_path, width=4.2*inch, height=1.8*inch)]]
-        t_v = Table(v_data, colWidths=[3*inch, 4*inch])
-        t_v.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (-1,-1), 'CENTER')]))
-        story.append(t_v)
-        
-        story.append(PageBreak())
+            # Time Series: RULA/REBA/AI
+            plt.figure(figsize=(8, 3.5))
+            plt.plot(df['timestamp'], df['RULA_score'], color='#00d4ff', label='RULA (Upper)', linewidth=1.0, alpha=0.5)
+            plt.plot(df['timestamp'], df['REBA_score'], color='#9b59ff', label='REBA (Full)', linewidth=1.0, alpha=0.5)
+            if 'ai_risk_score' in df.columns:
+                plt.plot(df['timestamp'], df['ai_risk_score'], color='#ff4d6d', label='Ergo-Net MSK Index', linewidth=2.0)
+                plt.fill_between(df['timestamp'], df['ai_risk_score'], color='#ff4d6d', alpha=0.1)
+            plt.axhline(y=5, color='orange', linestyle='--', alpha=0.5, label='Concern Threshold')
+            plt.xlabel('Time (seconds)')
+            plt.ylabel('Clinical Score')
+            plt.title('Biomechanical Strain Over Time')
+            plt.legend(loc='upper right', fontsize='small', ncol=3)
+            plt.grid(True, which='both', linestyle='--', alpha=0.3)
+            plt.savefig(timeline_path)
+            plt.close()
 
-        # 7. CLINICAL OBSERVATIONS
-        story.append(Paragraph("5. Pathological Observations & Anomalies", h2_style))
-        
-        anoms = df[df['anomalies'] != "None"]['anomalies'].unique()
-        if len(anoms) > 0:
-            story.append(Paragraph("The system identified specific pathological posture markers during this session:", h3_style))
-            anom_list = "<ul>"
-            all_anoms = []
-            for entry in anoms:
-                if isinstance(entry, str):
-                    all_anoms.extend(entry.split("; "))
-            unique_anoms = list(set(all_anoms))
-            for a in unique_anoms[:10]:
-                anom_list += f"<li>{a}</li>"
-            anom_list += "</ul>"
-            story.append(Paragraph(anom_list, normal_style))
-        else:
-            story.append(Paragraph("No significant kinematic anomalies detected. Physiological joint ranges maintained.", clinical_style))
-        
-        story.append(Spacer(1, 20))
+            v_data = [[Image(pie_path, width=2.8*inch, height=2.8*inch), Image(timeline_path, width=4.2*inch, height=1.8*inch)]]
+            t_v = Table(v_data, colWidths=[3*inch, 4*inch])
+            t_v.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (-1,-1), 'CENTER')]))
+            story.append(t_v)
+            story.append(PageBreak())
 
-        # 8. CORRECTIVE ACTION PLAN (CLINICAL)
-        story.append(Paragraph("6. Professional Corrective Action Plan (CAP)", h2_style))
-        
-        cap_logic = []
-        if rula_max >= 7 or ai_risk_max > 8.0:
-            cap_logic.append("<b>Urgent:</b> Ergonomic workstation overhaul. Immediate reduction of static load and repetitive reach required.")
-        if reba_max >= 8 or ai_risk_max > 6.0:
-            cap_logic.append("<b>Required:</b> Use of biomechanical aids (e.g., exoskeleton, adjustable height desks) to mitigate full-body strain.")
-        if df['neck_deg'].max() > 30:
-            cap_logic.append("<b>Cervical Spine:</b> Re-align visual axis to horizontal. Monitor height adjustment required to avoid cervical disk compression.")
-        if df['trunk_deg'].max() > 45:
-            cap_logic.append("<b>Lumbar Spine:</b> High risk of lower back strain. Implement lumbar support or sit-stand protocol.")
-        if df['ua_left_deg'].max() > 60 or df['ua_right_deg'].max() > 60:
-            cap_logic.append("<b>Shoulder:</b> Reduce humeral abduction/flexion. Adjust input device height to neutral elbow position.")
+            # 7. CLINICAL OBSERVATIONS
+            story.append(Paragraph("5. Pathological Observations & Anomalies", h2_style))
+            anoms = df[df['anomalies'] != "None"]['anomalies'].unique() if 'anomalies' in df.columns else []
+            if len(anoms) > 0:
+                story.append(Paragraph("The system identified specific pathological posture markers during this session:", h3_style))
+                anom_list = "<ul>"
+                all_anoms = []
+                for entry in anoms:
+                    if isinstance(entry, str):
+                        all_anoms.extend(entry.split("; "))
+                unique_anoms = list(set(all_anoms))
+                for a in unique_anoms[:10]:
+                    anom_list += f"<li>{a}</li>"
+                anom_list += "</ul>"
+                story.append(Paragraph(anom_list, normal_style))
+            else:
+                story.append(Paragraph("No significant kinematic anomalies detected. Physiological joint ranges maintained.", clinical_style))
+            story.append(Spacer(1, 20))
 
-        if not cap_logic:
-            cap_logic.append("Continue current practices. Scheduled follow-up in 90 days recommended for preventative monitoring.")
+            # 8. CORRECTIVE ACTION PLAN (CLINICAL)
+            story.append(Paragraph("6. Professional Corrective Action Plan (CAP)", h2_style))
+            cap_logic = []
+            if rula_max >= 7 or ai_risk_max > 8.0:
+                cap_logic.append("<b>Urgent:</b> Ergonomic workstation overhaul. Immediate reduction of static load and repetitive reach required.")
+            if reba_max >= 8 or ai_risk_max > 6.0:
+                cap_logic.append("<b>Required:</b> Use of biomechanical aids (e.g., exoskeleton, adjustable height desks) to mitigate full-body strain.")
+            if 'neck_deg' in df.columns and df['neck_deg'].max() > 30:
+                cap_logic.append("<b>Cervical Spine:</b> Re-align visual axis to horizontal. Monitor height adjustment required to avoid cervical disk compression.")
+            if 'trunk_deg' in df.columns and df['trunk_deg'].max() > 45:
+                cap_logic.append("<b>Lumbar Spine:</b> High risk of lower back strain. Implement lumbar support or sit-stand protocol.")
+            if ('ua_left_deg' in df.columns and df['ua_left_deg'].max() > 60) or \
+               ('ua_right_deg' in df.columns and df['ua_right_deg'].max() > 60):
+                cap_logic.append("<b>Shoulder:</b> Reduce humeral abduction/flexion. Adjust input device height to neutral elbow position.")
+            if not cap_logic:
+                cap_logic.append("Continue current practices. Scheduled follow-up in 90 days recommended for preventative monitoring.")
+            cap_html = "<ul>" + "".join([f"<li>{item}</li>" for item in cap_logic]) + "</ul>"
+            story.append(Paragraph(cap_html, clinical_style))
+            story.append(Spacer(1, 30))
 
-        cap_html = "<ul>" + "".join([f"<li>{item}</li>" for item in cap_logic]) + "</ul>"
-        story.append(Paragraph(cap_html, clinical_style))
-        
-        story.append(Spacer(1, 30))
-        
-        # 9. DOCTOR'S NOTES AREA
-        story.append(Paragraph("7. Practitioner's Notes & Recommendations", h2_style))
-        story.append(Spacer(1, 10))
-        note_box = [[""]] * 5
-        t_note = Table(note_box, colWidths=[7*inch], rowHeights=[0.3*inch]*5)
-        t_note.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
-        story.append(t_note)
+            # 9. DOCTOR'S NOTES AREA
+            story.append(Paragraph("7. Practitioner's Notes & Recommendations", h2_style))
+            story.append(Spacer(1, 10))
+            note_box = [[""]] * 5
+            t_note = Table(note_box, colWidths=[7*inch], rowHeights=[0.3*inch]*5)
+            t_note.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
+            story.append(t_note)
+            story.append(Spacer(1, 40))
 
-        story.append(Spacer(1, 40))
-        
-        # 10. SIGN-OFF
-        story.append(Paragraph("-" * 35, normal_style))
-        story.append(Paragraph("Digitally Certified by ErgoVision Diagnostic Engine", styles['Italic']))
-        story.append(Paragraph(f"Report Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+            # 10. SIGN-OFF
+            story.append(Paragraph("-" * 35, normal_style))
+            story.append(Paragraph("Digitally Certified by ErgoVision Diagnostic Engine", styles['Italic']))
+            story.append(Paragraph(f"Report Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
 
-        # Build PDF
-        doc.build(story)
-        
-        # Cleanup
-        for p in [pie_path, timeline_path]:
-            if os.path.exists(p): os.remove(p)
-            
+            # Build PDF
+            doc.build(story)
+        finally:
+            # Always clean up temp images, even if doc.build() throws
+            for p in [pie_path, timeline_path]:
+                try:
+                    if os.path.exists(p):
+                        os.remove(p)
+                except Exception:
+                    pass
+
         return report_path
 
     @staticmethod

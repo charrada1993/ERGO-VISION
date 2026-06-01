@@ -403,7 +403,6 @@ class SkeletonBuilder:
 
         # Thigh roll (adduction/abduction in frontal plane) and yaw (internal rotation)
         # Left thigh
-        v_thi_l_n = _norm(v_thigh_down_l)
         v_thi_h_l = v_thigh_down_l - np.dot(v_thigh_down_l, v_up) * v_up  # horizontal component
         if np.linalg.norm(v_thi_h_l) > 1e-6:
             thi_roll_l = _signed_angle_deg(v_right, _norm(v_thi_h_l), v_up)
@@ -414,7 +413,6 @@ class SkeletonBuilder:
         angles['thi_yaw_l']  = thi_yaw_l
 
         # Right thigh
-        v_thi_r_n = _norm(v_thigh_down_r)
         v_thi_h_r = v_thigh_down_r - np.dot(v_thigh_down_r, v_up) * v_up
         if np.linalg.norm(v_thi_h_r) > 1e-6:
             thi_roll_r = _signed_angle_deg(v_right, _norm(v_thi_h_r), v_up)
