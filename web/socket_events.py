@@ -87,9 +87,27 @@ class SocketEvents:
             print("[Socket] Stop recording requested")
             self.is_recording = False
             import os
-            filename = os.path.basename(self.logger.session_path) if getattr(self.logger, 'session_path', None) else ""
+            csv_path = self.logger.session_path
+            filename = os.path.basename(csv_path) if csv_path else ""
             self.logger.end_session()
-            emit('recording_status', {'is_recording': False, 'samples': self.logger.sample_count, 'filename': filename})
+            
+            # Automatically generate PDF report in background
+            pdf_filename = ""
+            if csv_path and os.path.exists(csv_path) and self.logger.sample_count > 0:
+                try:
+                    from reporting.report_generator import ReportGenerator
+                    pdf_path = ReportGenerator.generate(csv_path)
+                    pdf_filename = os.path.basename(pdf_path)
+                    print(f"[Socket] Automatically generated PDF report: {pdf_filename}")
+                except Exception as e:
+                    print(f"[Socket] Error automatically generating PDF report: {e}")
+            
+            emit('recording_status', {
+                'is_recording': False, 
+                'samples': self.logger.sample_count, 
+                'filename': filename,
+                'pdf_filename': pdf_filename
+            })
 
     def process_loop(self):
         """
