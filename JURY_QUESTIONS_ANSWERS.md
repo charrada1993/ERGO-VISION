@@ -60,10 +60,10 @@
 ## 📐 Category C: Biomechanics & Ergonomic Assessment Standards
 
 ### Q5: Explain how you compute a 3D joint angle (like the Neck or Trunk Flexion) from the 3D coordinates returned by your vision pipeline.
-* **Answer:** "We model the body segments as 3D vectors. For example, to calculate the **Neck Flexion (Pitch)**, we construct a vector representing the head/neck line (from the midpoint of the ears/eyes to the shoulder center) and a vertical gravity-aligned axis or the spine line vector (shoulder center to hip center).
+* **Answer:** "We model the body segments as 3D vectors. For example, to calculate the **Neck Flexion/Extension**, we construct a vector representing the head/neck line (from the midpoint of the ears/eyes to the shoulder center) and a vertical gravity-aligned axis or the spine line vector (shoulder center to hip center).
 * The angle between two 3D vectors $\vec{u}$ and $\vec{v}$ is calculated using the dot product formula:
   $$\theta = \arccos\left(\frac{\vec{u} \cdot \vec{v}}{\|\vec{u}\| \|\vec{v}\|}\right)$$
-* For complex joints like **Shoulder Abduction** or **Trunk Yaw (Rotation)**, we project the vectors onto specific anatomical planes (sagittal, frontal, or transverse planes) using coordinate projections. For instance, **Trunk Yaw** is computed in the transverse plane by evaluating the rotation angle between the shoulder line vector and the hip line vector."
+* For complex joints like **Shoulder Abduction** or **Trunk Rotation**, we project the vectors onto specific anatomical planes (sagittal, frontal, or transverse planes) using coordinate projections. For instance, **Trunk Rotation** is computed in the transverse plane by evaluating the rotation angle between the shoulder line vector and the hip line vector."
 
 ### Q6: RULA and REBA scores usually flicker or jump rapidly on boundary conditions (e.g., a neck angle shifting between 19.9° and 20.1°). How does your system solve this?
 > [!IMPORTANT]

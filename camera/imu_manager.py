@@ -7,7 +7,7 @@
 #   1. Lucas-Kanade sparse optical flow tracks good feature points frame-to-frame.
 #   2. The average flow vector gives translational (pseudo-acceleration) motion.
 #   3. A homography estimated from the flow gives the rotational component
-#      which is decomposed into roll / pitch / yaw estimates.
+#      which is decomposed into lateral flexion, flexion/extension, and rotation estimates.
 #   4. All values are smoothed with a lightweight exponential moving average.
 #
 # Output dict matches the shape previously expected by the rest of the system
@@ -45,8 +45,8 @@ _SCALE_GYRO        = 0.5  # rotation deg/frame → pseudo rad/s
 class IMUManager:
     """
     Visual IMU: uses the RGB camera frames to produce IMU-like telemetry
-    (roll, pitch, yaw, pseudo-accelerometer, pseudo-gyroscope) without
-    any physical IMU sensor.
+    (lateral flexion, flexion/extension, rotation, pseudo-accelerometer,
+    pseudo-gyroscope) without any physical IMU sensor.
 
     Drop-in replacement for the hardware IMUManager.  The public API
     (setup / start / get_data / stop) is identical.
@@ -68,9 +68,9 @@ class IMUManager:
         self._frame_idx  = 0
 
         # Smoothed outputs
-        self._roll  = 0.0
-        self._pitch = 0.0
-        self._yaw   = 0.0
+        self._lateral_flex = 0.0
+        self._flex_ext     = 0.0
+        self._rotation     = 0.0
         self._ax    = 0.0   # pseudo-accel x (m/s² equivalent)
         self._ay    = 0.0
         self._gx    = 0.0   # pseudo-gyro x (rad/s equivalent)
@@ -180,7 +180,7 @@ class IMUManager:
         ay_raw = float(mean_flow[1]) * _SCALE_ACCEL
 
         # ── Homography → rotational component (throttled every N frames) ─────
-        roll_delta = pitch_delta = yaw_delta = 0.0
+        lat_flex_delta = flex_ext_delta = rot_delta = 0.0
         gz_raw     = 0.0
         self._homo_frame_idx += 1
 
@@ -189,32 +189,32 @@ class IMUManager:
             if H is not None:
                 angle_rad  = math.atan2(H[1, 0], H[0, 0])
                 gz_raw     = angle_rad * _SCALE_GYRO
-                yaw_delta  = math.degrees(angle_rad)
-        # else: reuse last gz_raw / yaw_delta (both stay 0 until first compute)
+                rot_delta  = math.degrees(angle_rad)
+        # else: reuse last gz_raw / rot_delta (both stay 0 until first compute)
 
-        # ── Exact formulas from reference screenshot ──────────────────────
-        # Pitch (θ) = atan2(ax, sqrt(ay² + az²)) × 180 / π
-        # Roll  (φ) = atan2(ay, sqrt(ax² + az²)) × 180 / π
+        # ── Orientation estimation from optical flow ──────────────────────
+        # Flexion/Extension (θ) = atan2(ax, sqrt(ay² + az²)) × 180 / π
+        # Lateral Flexion  (φ) = atan2(ay, sqrt(ax² + az²)) × 180 / π
         # ax/ay derived from mean optical-flow displacement; az≈0 (2-D camera)
         ax_raw = float(mean_flow[0]) * _SCALE_ACCEL
         ay_raw = float(mean_flow[1]) * _SCALE_ACCEL
         az_raw = 0.0
 
-        pitch_raw = math.degrees(
+        flex_ext_raw = math.degrees(
             math.atan2(ax_raw, math.sqrt(ay_raw ** 2 + az_raw ** 2))
         )
-        roll_raw  = math.degrees(
+        lat_flex_raw = math.degrees(
             math.atan2(ay_raw, math.sqrt(ax_raw ** 2 + az_raw ** 2))
         )
 
         # ── Exponential moving average (smoothing) ───────────────────────
         a = _EMA_ALPHA
-        self._ax    = a * ax_raw    + (1 - a) * self._ax
-        self._ay    = a * ay_raw    + (1 - a) * self._ay
-        self._gz    = a * gz_raw    + (1 - a) * self._gz
-        self._roll  = a * roll_raw  + (1 - a) * self._roll
-        self._pitch = a * pitch_raw + (1 - a) * self._pitch
-        self._yaw  += a * yaw_delta   # integrate yaw
+        self._ax           = a * ax_raw       + (1 - a) * self._ax
+        self._ay           = a * ay_raw       + (1 - a) * self._ay
+        self._gz           = a * gz_raw       + (1 - a) * self._gz
+        self._lateral_flex = a * lat_flex_raw  + (1 - a) * self._lateral_flex
+        self._flex_ext     = a * flex_ext_raw  + (1 - a) * self._flex_ext
+        self._rotation    += a * rot_delta      # integrate rotation
 
         # ── Update tracking state ────────────────────────────────────────
         self._prev_gray = gray
@@ -224,8 +224,8 @@ class IMUManager:
     # Snapshot helper
     # ------------------------------------------------------------------
     def _make_snapshot(self) -> dict:
-        # Build a unit quaternion from roll/pitch/yaw for compatibility
-        quat = self._euler_to_quat(self._roll, self._pitch, self._yaw)
+        # Build a unit quaternion from orientation components for compatibility
+        quat = self._orientation_to_quat(self._lateral_flex, self._flex_ext, self._rotation)
         return {
             'accel':           (self._ax, self._ay, 0.0),
             'gyro':            (self._gx, self._gy, self._gz),
@@ -235,7 +235,7 @@ class IMUManager:
             'gyro_ts_ms':      0.0,
             'rv_ts_ms':        0.0,
             'timestamp':       time.time(),
-            'euler':           (self._roll, self._pitch, self._yaw),
+            'orientation':     (self._lateral_flex, self._flex_ext, self._rotation),
         }
 
     # ------------------------------------------------------------------
@@ -249,11 +249,11 @@ class IMUManager:
     # Utility
     # ------------------------------------------------------------------
     @staticmethod
-    def _euler_to_quat(roll_deg: float, pitch_deg: float, yaw_deg: float):
-        """Roll/pitch/yaw (degrees) → unit quaternion (i, j, k, real)."""
-        r = math.radians(roll_deg)  / 2.0
-        p = math.radians(pitch_deg) / 2.0
-        y = math.radians(yaw_deg)   / 2.0
+    def _orientation_to_quat(lat_flex_deg: float, flex_ext_deg: float, rot_deg: float):
+        """Orientation angles (degrees) → unit quaternion (i, j, k, real)."""
+        r = math.radians(lat_flex_deg) / 2.0
+        p = math.radians(flex_ext_deg) / 2.0
+        y = math.radians(rot_deg)      / 2.0
 
         cr, sr = math.cos(r), math.sin(r)
         cp, sp = math.cos(p), math.sin(p)

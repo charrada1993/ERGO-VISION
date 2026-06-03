@@ -161,28 +161,70 @@ const scoreChart = new Chart(scoreCtx, {
 //  JOINT ANGLE TRENDS (12 individual charts)
 // ══════════════════════════════════════════════════════════
 const TREND_DEFS = [
-  { id: 'trend-neck', max: 180, min: -180, lines: [{key: 'neck', color: '#00d4ff'}, {key: 'neck_roll', color: '#ffb84d'}, {key: 'neck_yaw', color: '#ff4d6d'}] },
-  { id: 'trend-trunk', max: 180, min: -180, lines: [{key: 'trunk', color: '#00d4ff'}, {key: 'trunk_roll', color: '#ffb84d'}, {key: 'trunk_yaw', color: '#ff4d6d'}] },
-  { id: 'trend-rshl', max: 180, min: -180, lines: [{key: 'upper_arm_right', color: '#00d4ff'}, {key: 'abd_r', color: '#00ffaa'}] },
-  { id: 'trend-lshl', max: 180, min: -180, lines: [{key: 'upper_arm_left', color: '#00d4ff'}, {key: 'abd_l', color: '#00ffaa'}] },
-  { id: 'trend-relb', max: 180, min: -180, lines: [{key: 'elbow_right', color: '#00d4ff'}, {key: 'elb_roll_r', color: '#ffb84d'}] },
-  { id: 'trend-lelb', max: 180, min: -180, lines: [{key: 'elbow_left', color: '#00d4ff'}, {key: 'elb_roll_l', color: '#ffb84d'}] },
-  { id: 'trend-rwri', max: 180, min: -180, lines: [{key: 'wrist_right', color: '#00d4ff'}, {key: 'wri_roll_r', color: '#ffb84d'}, {key: 'wri_yaw_r', color: '#ff4d6d'}] },
-  { id: 'trend-lwri', max: 180, min: -180, lines: [{key: 'wrist_left', color: '#00d4ff'}, {key: 'wri_roll_l', color: '#ffb84d'}, {key: 'wri_yaw_l', color: '#ff4d6d'}] },
-  { id: 'trend-rthi', max: 180, min: -180, lines: [{key: 'hip_right', color: '#00d4ff'}, {key: 'thi_roll_r', color: '#ffb84d'}, {key: 'thi_yaw_r', color: '#ff4d6d'}] },
-  { id: 'trend-lthi', max: 180, min: -180, lines: [{key: 'hip_left', color: '#00d4ff'}, {key: 'thi_roll_l', color: '#ffb84d'}, {key: 'thi_yaw_l', color: '#ff4d6d'}] },
-  { id: 'trend-rkne', max: 180, min: -180, lines: [{key: 'knee_right', color: '#00d4ff'}] },
-  { id: 'trend-lkne', max: 180, min: -180, lines: [{key: 'knee_left', color: '#00d4ff'}] },
+  { id: 'trend-neck', max: 180, min: -180, lines: [{key: 'neck', color: '#00d4ff'}, {key: 'neck_lateral_flexion', color: '#ffb84d'}, {key: 'neck_rotation', color: '#ff4d6d'}] },
+  { id: 'trend-trunk', max: 180, min: -180, lines: [{key: 'trunk', color: '#00d4ff'}, {key: 'trunk_lateral_flexion', color: '#ffb84d'}, {key: 'trunk_rotation', color: '#ff4d6d'}] },
+  { id: 'trend-rshl', max: 180, min: -180, lines: [{key: 'upper_arm_right', color: '#00d4ff'}, {key: 'abd_r', color: '#ffb84d'}, {key: 'shl_rotation_r', color: '#ff4d6d'}] },
+  { id: 'trend-lshl', max: 180, min: -180, lines: [{key: 'upper_arm_left', color: '#00d4ff'}, {key: 'abd_l', color: '#ffb84d'}, {key: 'shl_rotation_l', color: '#ff4d6d'}] },
+  { id: 'trend-relb', max: 180, min: -180, lines: [{key: 'elbow_right', color: '#00d4ff'}, {key: 'elb_rotation_r', color: '#ffb84d'}, {key: 'elb_deviation_r', color: '#ff4d6d'}] },
+  { id: 'trend-lelb', max: 180, min: -180, lines: [{key: 'elbow_left', color: '#00d4ff'}, {key: 'elb_rotation_l', color: '#ffb84d'}, {key: 'elb_deviation_l', color: '#ff4d6d'}] },
+  { id: 'trend-rwri', max: 180, min: -180, lines: [{key: 'wrist_right', color: '#00d4ff'}, {key: 'wri_deviation_r', color: '#ffb84d'}, {key: 'wri_rotation_r', color: '#ff4d6d'}] },
+  { id: 'trend-lwri', max: 180, min: -180, lines: [{key: 'wrist_left', color: '#00d4ff'}, {key: 'wri_deviation_l', color: '#ffb84d'}, {key: 'wri_rotation_l', color: '#ff4d6d'}] },
+  { id: 'trend-rthi', max: 180, min: -180, lines: [{key: 'hip_right', color: '#00d4ff'}, {key: 'thi_abduction_adduction_r', color: '#ffb84d'}, {key: 'thi_rotation_r', color: '#ff4d6d'}] },
+  { id: 'trend-lthi', max: 180, min: -180, lines: [{key: 'hip_left', color: '#00d4ff'}, {key: 'thi_abduction_adduction_l', color: '#ffb84d'}, {key: 'thi_rotation_l', color: '#ff4d6d'}] },
+  { id: 'trend-rkne', max: 180, min: -180, lines: [{key: 'knee_right', color: '#00d4ff'}, {key: 'kne_deviation_r', color: '#ffb84d'}, {key: 'kne_rotation_r', color: '#ff4d6d'}] },
+  { id: 'trend-lkne', max: 180, min: -180, lines: [{key: 'knee_left', color: '#00d4ff'}, {key: 'kne_deviation_l', color: '#ffb84d'}, {key: 'kne_rotation_l', color: '#ff4d6d'}] },
 ];
 
 // ── Axis label mapping for numeric badges ────────────────────────────────
-// Maps angle key suffix → short display label used in the RPY badge row.
+// Maps angle key suffix → anatomical display label.
 function _axisLabel(key) {
-  if (key.endsWith('_yaw')   || key === 'trunk_yaw')    return 'Yaw';
-  if (key.endsWith('_roll')  || key.includes('roll'))   return 'Roll';
-  if (key.startsWith('abd')) return 'Abd';
-  // Primary angle key (no suffix) = Pitch / Flex
-  return 'Pitch';
+  const mapping = {
+    // Neck
+    'neck': 'Flex/Ext',
+    'neck_lateral_flexion': 'Lat Flex',
+    'neck_rotation': 'Rotation',
+    // Trunk
+    'trunk': 'Flex/Ext',
+    'trunk_lateral_flexion': 'Lat Flex',
+    'trunk_rotation': 'Rotation',
+    'trunk_rot': 'Rotation',
+    // Shoulder
+    'upper_arm_left': 'Flex/Ext',
+    'upper_arm_right': 'Flex/Ext',
+    'abd_l': 'Abd/Add',
+    'abd_r': 'Abd/Add',
+    'shl_rotation_l': 'Rotation',
+    'shl_rotation_r': 'Rotation',
+    // Elbow
+    'elbow_left': 'Flex/Ext',
+    'elbow_right': 'Flex/Ext',
+    'elb_rotation_l': 'Forearm Rot',
+    'elb_rotation_r': 'Forearm Rot',
+    'elb_deviation_l': 'Deviation',
+    'elb_deviation_r': 'Deviation',
+    // Wrist
+    'wrist_left': 'Flex/Ext',
+    'wrist_right': 'Flex/Ext',
+    'wri_deviation_l': 'Rad/Uln Dev',
+    'wri_deviation_r': 'Rad/Uln Dev',
+    'wri_rotation_l': 'Forearm Rot',
+    'wri_rotation_r': 'Forearm Rot',
+    // Hip/Thigh
+    'hip_left': 'Flex/Ext',
+    'hip_right': 'Flex/Ext',
+    'thi_abduction_adduction_l': 'Abd/Add',
+    'thi_abduction_adduction_r': 'Abd/Add',
+    'thi_rotation_l': 'Int/Ext Rot',
+    'thi_rotation_r': 'Int/Ext Rot',
+    // Knee
+    'knee_left': 'Flex/Ext',
+    'knee_right': 'Flex/Ext',
+    'kne_deviation_l': 'Deviation',
+    'kne_deviation_r': 'Deviation',
+    'kne_rotation_l': 'Rotation',
+    'kne_rotation_r': 'Rotation'
+  };
+  return mapping[key] || 'Angle';
 }
 
 const trendCharts = {};
@@ -209,10 +251,29 @@ TREND_DEFS.forEach(def => {
           title: { display: true, text: 'Degrees', color: '#6b7a99', font: { size: 9 } }
         }
       }
-    }
+    },
+    plugins: [{
+      id: 'zeroLine',
+      afterDraw: (chart) => {
+        const yAxis = chart.scales.y;
+        const zeroY = yAxis.getPixelForValue(0);
+        if (zeroY >= yAxis.top && zeroY <= yAxis.bottom) {
+          const ctx = chart.ctx;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(chart.scales.x.left, zeroY);
+          ctx.lineTo(chart.scales.x.right, zeroY);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }]
   });
 
-  // ── Inject numeric RPY badge row ──────────────────────────────────────
+  // ── Inject numeric angle badge row ────────────────────────────────────
   // Find the parent .tc-chart wrapper that holds the canvas
   const tcChart = el.closest('.tc-chart') || el.parentElement;
   const badgeRow = document.createElement('div');

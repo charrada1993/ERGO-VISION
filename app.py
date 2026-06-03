@@ -126,6 +126,20 @@ def main():
     app.config['CALIBRATION']     = calibrations[0] if calibrations else None
     app.config['IMU_MANAGER']     = imu_mgr
 
+    # Load calibration offsets from file on startup
+    import json
+    offsets_file = os.path.join(Config.BASE_DIR, 'data', 'calibration_offsets.json')
+    if os.path.exists(offsets_file):
+        try:
+            with open(offsets_file, 'r') as f:
+                app.config['ANGLE_OFFSETS'] = json.load(f)
+            print(f"[Main] Loaded calibration offsets: {app.config['ANGLE_OFFSETS']}")
+        except Exception as e:
+            print(f"[Main] Failed to load calibration offsets: {e}")
+            app.config['ANGLE_OFFSETS'] = {}
+    else:
+        app.config['ANGLE_OFFSETS'] = {}
+
     # ── 8. Socket event handler ──────────────────────────────────────────
     socket_events = SocketEvents(
         socketio, cam_managers, pose_est, pose_fusion,

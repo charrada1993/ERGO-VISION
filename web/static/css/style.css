@@ -587,7 +587,7 @@ body.light-mode .body-svg line { stroke: rgba(0,0,0,0.15); }
 /* Timeline chart */
 .history-chart { padding: 1.4rem; }
 
-/* ── Trend card RPY numeric badge row ───────────────────────── */
+/* ── Trend card angle numeric badge row ─────────────────────── */
 /* Light-mode: flip badge background/border so they remain legible */
 body.light-mode .tc-chart + div > div {
   background: rgba(0,0,0,0.04) !important;
@@ -695,7 +695,7 @@ body.light-mode .theme-btn:hover {
     background: rgba(0, 0, 0, 0.2);
 }
 body.light-mode .imu-axis,
-body.light-mode .euler-chip,
+body.light-mode .angle-chip,
 body.light-mode .cam-stat,
 body.light-mode .joint-readout {
     background: rgba(0, 0, 0, 0.05);

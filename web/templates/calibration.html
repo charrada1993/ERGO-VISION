@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ErgoVision | System Calibration</title>
+  <meta name="description" content="Calibrate the camera joint angles to establish the 0-degree neutral posture reference">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+  <style>
+    /* Premium layout refinements */
+    .calibration-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      .calibration-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .ref-img-container {
+      width: 100%;
+      height: 320px;
+      background: #0d1117;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .ref-img-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-badge.uncalibrated {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .status-badge.calibrated {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .controls-card {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn-calibrate {
+      flex: 2;
+      background: var(--cyan);
+      color: #000;
+      font-weight: 700;
+      border: none;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-calibrate:hover:not(:disabled) {
+      background: #00b4d8;
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    }
+
+    .btn-calibrate:disabled {
+      background: var(--border);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    .btn-reset {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-reset:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Countdown circular display */
+    .countdown-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      border-radius: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .countdown-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .countdown-number {
+      font-size: 5rem;
+      font-weight: 800;
+      color: var(--cyan);
+      text-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+      margin-bottom: 0.5rem;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.8; }
+    }
+
+    /* Calibration Table */
+    .calib-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .calib-table th, .calib-table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .calib-table th {
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+    }
+
+    .calib-val-badge {
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .calib-val-badge.raw {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+    }
+
+    .calib-val-badge.offset {
+      background: rgba(0, 212, 255, 0.08);
+      color: var(--cyan);
+    }
+
+    .calib-val-badge.calibrated {
+      background: rgba(16, 185, 129, 0.08);
+      color: #10b981;
+      font-weight: bold;
+    }
+
+    .gauge-container {
+      width: 100px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .gauge-bar {
+      height: 100%;
+      background: #10b981;
+      position: absolute;
+      left: 50%;
+      width: 0%;
+      transition: width 0.1s ease, left 0.1s ease;
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-icon"><i class="fas fa-heartbeat"></i></span>
+      <span class="logo">ErgoVision</span>
+      <span class="badge-pill">Calibrate</span>
+    </div>
+    <div class="nav-links">
+      <a href="/"><i class="fas fa-gauge-high"></i><span>Dashboard</span></a>
+      <a href="/camera"><i class="fas fa-video"></i><span>Live Feed</span></a>
+      <a href="/calibration" class="active"><i class="fas fa-sliders"></i><span>Calibration</span></a>
+      <a href="/rula"><i class="fas fa-person-rays"></i><span>RULA</span></a>
+      <a href="/reba"><i class="fas fa-person"></i><span>REBA</span></a>
+      <a href="/3d"><i class="fas fa-cube"></i><span>3D View</span></a>
+      <a href="/ai"><i class="fas fa-brain"></i><span>AI Model</span></a>
+      <a href="/collection"><i class="fas fa-database"></i><span>Record Data</span></a>
+      <a href="/report"><i class="fas fa-file-pdf"></i><span>Reports</span></a>
+    </div>
+    <div class="nav-right">
+      <div class="live-dot">LIVE</div>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+    </div>
+  </nav>
+
+  <main class="container">
+
+    <div class="page-header">
+      <h1 class="page-title"><i class="fas fa-sliders"></i> System Calibration</h1>
+      <p class="page-sub">Position yourself in front of the camera and establish the neutral zero-degree reference posture.</p>
+    </div>
+
+    <div class="calibration-grid">
+
+      <!-- Left Column: Live Video + Skeleton Overlay -->
+      <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; position: relative;">
+        <div class="panel-header" style="padding: 1rem; border-bottom: 1px solid var(--border);">
+          <div class="panel-title"><i class="fas fa-video" style="color:var(--cyan)"></i> Live Camera View</div>
+          <button id="skelToggleBtn" class="theme-btn" style="padding: 0.25rem 0.75rem; border: 1px solid var(--cyan); background: rgba(0, 212, 255, 0.1); color: var(--cyan); border-radius: 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer;">SKEL ON</button>
+        </div>
+        
+        <div style="position: relative; width: 100%; background: #000; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 360px;">
+          <!-- Countdown Overlay -->
+          <div class="countdown-overlay" id="countdownOverlay">
+            <div class="countdown-number" id="countdownNum">3</div>
+            <div style="color: var(--text); font-weight: bold;" id="countdownStatus">Stand still in the neutral posture...</div>
+          </div>
+          
+          <img id="videoFeed" src="/video_feed" alt="Live RGB Camera Feed" style="width: 100%; height: 100%; object-fit: cover;">
+          <canvas id="skelCanvas" style="position: absolute; top: 0; left: 0; z-index: 5; pointer-events: none;"></canvas>
+        </div>
+      </div>
+
+      <!-- Right Column: Reference & Controls -->
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Posture Reference Card -->
+        <div class="card" style="margin-bottom:0;">
+          <div class="panel-header" style="padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="panel-title"><i class="fas fa-image" style="color:var(--cyan)"></i> Neutral 0° Posture Guide</div>
+          </div>
+          <div class="ref-img-container">
+            <img src="/static/images/neutral_posture_guide.png" alt="0-degree neutral posture reference">
+          </div>
+        </div>
+
+        <!-- Controls Card -->
+        <div class="card controls-card" style="margin-bottom:0;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-weight: 600; font-size: 0.95rem; color: var(--text);">Calibration Status</span>
+            <span class="status-badge uncalibrated" id="calibStatusBadge">Uncalibrated / Raw Default</span>
+          </div>
+
+          <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+            Calibration records raw joint angles over 3 seconds and offsets them to exactly 0°. Make sure you align with the guide above, relax your shoulders, and face the camera directly.
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-calibrate" id="btnCalibrate">
+              <i class="fas fa-arrows-to-eye"></i> Start 3s Calibration
+            </button>
+            <button class="btn-reset" id="btnReset" title="Reset to raw defaults">
+              <i class="fas fa-rotate-left"></i> Reset
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Full-Width Card: Live Telemetry Table -->
+    <div class="card">
+      <div class="panel-header" style="padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+        <div class="panel-title"><i class="fas fa-table" style="color:var(--cyan)"></i> Live Joint Calibration Telemetry</div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="calib-table">
+          <thead>
+            <tr>
+              <th>Joint Name</th>
+              <th>Raw Angle</th>
+              <th>Active Offset</th>
+              <th>Calibrated Angle</th>
+              <th>Zero Alignment Gauge</th>
+            </tr>
+          </thead>
+          <tbody id="telemetryBody">
+            <!-- Populated dynamically via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="status-chip"><span class="dot" id="camDot"></span><i class="fas fa-camera" style="color:var(--text-muted);font-size:0.7rem"></i> Camera: <strong id="camStatus">Connecting…</strong></div>
+      <div class="status-chip" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
+        <i class="fas fa-gauge" style="color:var(--cyan)"></i> FPS <strong id="fpsStat">--</strong>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const socket = io();
+
+    // Theme toggle
+    const themeBtn = document.getElementById('themeBtn');
+    function applyTheme(isLight) {
+      document.body.classList.toggle('light-mode', isLight);
+      themeBtn.innerHTML = isLight ? '☀️' : '🌙';
+      localStorage.setItem('ergo-theme', isLight ? 'light' : 'dark');
+    }
+    themeBtn.addEventListener('click', () => applyTheme(!document.body.classList.contains('light-mode')));
+    applyTheme(localStorage.getItem('ergo-theme') === 'light');
+
+    // FPS counter
+    let frameCount = 0;
+    setInterval(() => {
+      document.getElementById('fpsStat').textContent = frameCount;
+      frameCount = 0;
+    }, 1000);
+
+    // Joints mapping
+    const JOINTS = [
+      { key: 'neck', name: 'Neck Flexion/Extension' },
+      { key: 'trunk', name: 'Trunk Flexion/Extension' },
+      { key: 'upper_arm_left', name: 'Left Shoulder Flexion' },
+      { key: 'upper_arm_right', name: 'Right Shoulder Flexion' },
+      { key: 'elbow_left', name: 'Left Elbow Flexion/Extension' },
+      { key: 'elbow_right', name: 'Right Elbow Flexion/Extension' },
+      { key: 'wrist_left', name: 'Left Wrist Radial/Ulnar Deviation' },
+      { key: 'wrist_right', name: 'Right Wrist Radial/Ulnar Deviation' },
+      { key: 'hip_left', name: 'Left Hip Flexion/Extension' },
+      { key: 'hip_right', name: 'Right Hip Flexion/Extension' },
+      { key: 'knee_left', name: 'Left Knee Flexion/Extension' },
+      { key: 'knee_right', name: 'Right Knee Flexion/Extension' }
+    ];
+
+    // Current active offsets
+    let activeOffsets = {};
+
+    // Load active offsets from API on mount
+    async function loadOffsets() {
+      try {
+        const res = await fetch('/api/calibration/offsets');
+        const data = await res.json();
+        activeOffsets = data.offsets || {};
+        updateStatusBadge();
+      } catch (err) {
+        console.error("Failed to load offsets", err);
+      }
+    }
+
+    function updateStatusBadge() {
+      const badge = document.getElementById('calibStatusBadge');
+      const hasCalibration = Object.keys(activeOffsets).length > 0;
+      if (hasCalibration) {
+        badge.textContent = "Active Offset Calibration";
+        badge.className = "status-badge calibrated";
+      } else {
+        badge.textContent = "Uncalibrated / Raw Default";
+        badge.className = "status-badge uncalibrated";
+      }
+    }
+
+    // Populate telemetry table rows
+    const tbody = document.getElementById('telemetryBody');
+    tbody.innerHTML = JOINTS.map(j => `
+      <tr id="row-${j.key}">
+        <td style="font-weight: 500;">${j.name}</td>
+        <td><span class="calib-val-badge raw" id="raw-${j.key}">--</span></td>
+        <td><span class="calib-val-badge offset" id="offset-${j.key}">0.0°</span></td>
+        <td><span class="calib-val-badge calibrated" id="calib-${j.key}">--</span></td>
+        <td>
+          <div class="gauge-container">
+            <div class="gauge-bar" id="gauge-${j.key}"></div>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    // Active calibration collection state
+    let isCalibrating = false;
+    let calibrationFrames = [];
+
+    // Socket listeners
+    socket.on('pose_update', (data) => {
+      frameCount++;
+      const raw = data.raw_angles || {};
+      const cal = data.angles || {};
+
+      // If calibration countdown is active, collect frames
+      if (isCalibrating) {
+        calibrationFrames.push(JSON.parse(JSON.stringify(raw)));
+      }
+
+      JOINTS.forEach(j => {
+        const rawVal = raw[j.key];
+        const calVal = cal[j.key];
+        const offsetVal = activeOffsets[j.key] || 0;
+
+        // Update raw element
+        const rawEl = document.getElementById(`raw-${j.key}`);
+        if (rawVal !== undefined && rawVal !== null) {
+          rawEl.textContent = (+rawVal).toFixed(1) + '°';
+        } else {
+          rawEl.textContent = '--';
+        }
+
+        // Update offset element
+        const offsetEl = document.getElementById(`offset-${j.key}`);
+        offsetEl.textContent = (+offsetVal).toFixed(1) + '°';
+
+        // Update calibrated element
+        const calEl = document.getElementById(`calib-${j.key}`);
+        if (calVal !== undefined && calVal !== null) {
+          calEl.textContent = (+calVal).toFixed(1) + '°';
+          
+          // Update visual alignment gauge: center is 0, full deviation is ±45 deg
+          const gaugeBar = document.getElementById(`gauge-${j.key}`);
+          let percent = Math.min(Math.max(calVal / 45 * 50, -50), 50); // -50% to +50%
+          if (percent >= 0) {
+            gaugeBar.style.left = '50%';
+            gaugeBar.style.width = percent + '%';
+            gaugeBar.style.background = '#10b981'; // green when close, transition to red/orange?
+          } else {
+            gaugeBar.style.left = (50 + percent) + '%';
+            gaugeBar.style.width = (-percent) + '%';
+            gaugeBar.style.background = '#10b981';
+          }
+        } else {
+          calEl.textContent = '--';
+          const gaugeBar = document.getElementById(`gauge-${j.key}`);
+          gaugeBar.style.width = '0%';
+        }
+      });
+    });
+
+    socket.on('connect', () => {
+      document.getElementById('camStatus').textContent = 'Active';
+      document.getElementById('camDot').className = 'dot ok';
+    });
+
+    socket.on('disconnect', () => {
+      document.getElementById('camStatus').textContent = 'Disconnected';
+      document.getElementById('camDot').className = 'dot warn';
+    });
+
+    // Countdown and average calibration
+    const btnCalibrate = document.getElementById('btnCalibrate');
+    const btnReset = document.getElementById('btnReset');
+    const countdownOverlay = document.getElementById('countdownOverlay');
+    const countdownNum = document.getElementById('countdownNum');
+    const countdownStatus = document.getElementById('countdownStatus');
+
+    btnCalibrate.addEventListener('click', async () => {
+      if (isCalibrating) return;
+      btnCalibrate.disabled = true;
+      btnReset.disabled = true;
+
+      // Reset collection array
+      calibrationFrames = [];
+      countdownOverlay.classList.add('active');
+
+      // 3-second countdown
+      for (let i = 3; i > 0; i--) {
+        countdownNum.textContent = i;
+        countdownStatus.textContent = "Stand still in the neutral posture...";
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      // Start collecting frames for 3 seconds
+      countdownNum.textContent = "📷";
+      countdownStatus.textContent = "Calibrating... Keep steady...";
+      isCalibrating = true;
+      await new Promise(r => setTimeout(r, 3000));
+      isCalibrating = false;
+
+      // Close countdown overlay
+      countdownOverlay.classList.remove('active');
+
+      if (calibrationFrames.length === 0) {
+        alert("Failed to collect calibration frames. Ensure you are in camera view.");
+        btnCalibrate.disabled = false;
+        btnReset.disabled = false;
+        return;
+      }
+
+      // Calculate averages
+      const averages = {};
+      JOINTS.forEach(j => {
+        let sum = 0;
+        let count = 0;
+        calibrationFrames.forEach(f => {
+          if (f[j.key] !== undefined && f[j.key] !== null) {
+            sum += f[j.key];
+            count++;
+          }
+        });
+        if (count > 0) {
+          averages[j.key] = sum / count;
+        } else {
+          averages[j.key] = 0.0;
+        }
+      });
+
+      // Send to API
+      try {
+        const res = await fetch('/api/calibration/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ offsets: averages })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+          activeOffsets = result.offsets;
+          updateStatusBadge();
+        } else {
+          alert("Error saving calibration: " + result.message);
+        }
+      } catch (err) {
+        alert("Failed to connect to API to save calibration.");
+      }
+
+      btnCalibrate.disabled = false;
+      btnReset.disabled = false;
+    });
+
+    btnReset.addEventListener('click', async () => {
+      if (!confirm("Are you sure you want to reset calibration to raw default angles?")) return;
+      try {
+        const res = await fetch('/api/calibration/reset', { method: 'POST' });
+        const result = await res.json();
+        if (result.status === 'success') {
+          activeOffsets = {};
+          updateStatusBadge();
+        }
+      } catch (err) {
+        alert("Failed to connect to API to reset calibration.");
+      }
+    });
+
+    // Load active offsets on startup
+    loadOffsets();
+
+    // ── Skeleton Overlay Canvas Logic ──
+    const skelCanvas = document.getElementById('skelCanvas');
+    const skelCtx = skelCanvas.getContext('2d');
+    const videoImg = document.getElementById('videoFeed');
+    let skelVisible = true;
+    let latestLandmarks = null;
+
+    const LM = {
+      NOSE:0, L_EAR:7, R_EAR:8,
+      L_SHOULDER:11, R_SHOULDER:12,
+      L_ELBOW:13,    R_ELBOW:14,
+      L_WRIST:15,    R_WRIST:16,
+      L_HIP:23,      R_HIP:24,
+      L_KNEE:25,     R_KNEE:26,
+      L_ANKLE:27,    R_ANKLE:28,
+      L_FOOT:31,     R_FOOT:32,
+    };
+
+    const BONES = [
+      [LM.NOSE,       LM.L_EAR,       '#ffffff', '#00eaff'],
+      [LM.NOSE,       LM.R_EAR,       '#ffffff', '#00eaff'],
+      [LM.L_SHOULDER, LM.NOSE,        '#ffffff', '#ffffff'],
+      [LM.R_SHOULDER, LM.NOSE,        '#ffffff', '#ffffff'],
+      [LM.L_SHOULDER, LM.R_SHOULDER,  '#ffd166', '#ffd166'],
+      [LM.L_SHOULDER, LM.L_ELBOW,     '#00eaff', '#06d6a0'],
+      [LM.L_ELBOW,    LM.L_WRIST,     '#06d6a0', '#a8ff78'],
+      [LM.R_SHOULDER, LM.R_ELBOW,     '#ff6b6b', '#f7971e'],
+      [LM.R_ELBOW,    LM.R_WRIST,     '#f7971e', '#ffd166'],
+      [LM.L_SHOULDER, LM.L_HIP,       '#00eaff', '#ffd166'],
+      [LM.R_SHOULDER, LM.R_HIP,       '#ff6b6b', '#ffd166'],
+      [LM.L_HIP,      LM.R_HIP,       '#ffd166', '#ffd166'],
+      [LM.L_HIP,      LM.L_KNEE,      '#00eaff', '#06d6a0'],
+      [LM.L_KNEE,     LM.L_ANKLE,     '#06d6a0', '#a8ff78'],
+      [LM.L_ANKLE,    LM.L_FOOT,      '#a8ff78', '#a8ff78'],
+      [LM.R_HIP,      LM.R_KNEE,      '#ff6b6b', '#f7971e'],
+      [LM.R_KNEE,     LM.R_ANKLE,     '#f7971e', '#ffd166'],
+      [LM.R_ANKLE,    LM.R_FOOT,      '#ffd166', '#ffd166'],
+    ];
+
+    const JOINT_COLORS = {};
+    JOINT_COLORS[LM.L_SHOULDER] = '#ffd166';
+    JOINT_COLORS[LM.R_SHOULDER] = '#ffd166';
+    JOINT_COLORS[LM.L_HIP]      = '#f7971e';
+    JOINT_COLORS[LM.R_HIP]      = '#f7971e';
+    JOINT_COLORS[LM.NOSE]       = '#ffffff';
+    JOINT_COLORS[LM.L_EAR]      = '#00eaff';
+    JOINT_COLORS[LM.R_EAR]      = '#00eaff';
+    JOINT_COLORS[LM.L_ELBOW]    = '#06d6a0';
+    JOINT_COLORS[LM.R_ELBOW]    = '#ff6b6b';
+    JOINT_COLORS[LM.L_WRIST]    = '#a8ff78';
+    JOINT_COLORS[LM.R_WRIST]    = '#f7971e';
+    JOINT_COLORS[LM.L_KNEE]     = '#06d6a0';
+    JOINT_COLORS[LM.R_KNEE]     = '#f7971e';
+    JOINT_COLORS[LM.L_ANKLE]    = '#a8ff78';
+    JOINT_COLORS[LM.R_ANKLE]    = '#ffd166';
+
+    const DRAW_JOINTS = [
+      LM.NOSE, LM.L_EAR, LM.R_EAR,
+      LM.L_SHOULDER, LM.R_SHOULDER,
+      LM.L_ELBOW,    LM.R_ELBOW,
+      LM.L_WRIST,    LM.R_WRIST,
+      LM.L_HIP,      LM.R_HIP,
+      LM.L_KNEE,     LM.R_KNEE,
+      LM.L_ANKLE,    LM.R_ANKLE,
+      LM.L_FOOT,     LM.R_FOOT,
+    ];
+
+    function syncCanvasSize() {
+      const rect = videoImg.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        skelCanvas.width = rect.width;
+        skelCanvas.height = rect.height;
+        skelCanvas.style.width = rect.width + 'px';
+        skelCanvas.style.height = rect.height + 'px';
+      }
+    }
+
+    function lmPx(lm, W, H) {
+      return [lm[0] * W, lm[1] * H];
+    }
+
+    function drawSkeleton(landmarks) {
+      syncCanvasSize();
+      const W = skelCanvas.width;
+      const H = skelCanvas.height;
+      skelCtx.clearRect(0, 0, W, H);
+      if (!skelVisible || !landmarks || landmarks.length < 29) return;
+
+      // Draw bones
+      for (const [a, b, colA, colB] of BONES) {
+        if (a >= landmarks.length || b >= landmarks.length) continue;
+        const [x1, y1] = lmPx(landmarks[a], W, H);
+        const [x2, y2] = lmPx(landmarks[b], W, H);
+        if (x1 === 0 && y1 === 0) continue;
+        if (x2 === 0 && y2 === 0) continue;
+
+        const grad = skelCtx.createLinearGradient(x1, y1, x2, y2);
+        grad.addColorStop(0, colA);
+        grad.addColorStop(1, colB);
+
+        // Glow halo
+        skelCtx.beginPath();
+        skelCtx.moveTo(x1, y1); skelCtx.lineTo(x2, y2);
+        skelCtx.strokeStyle = colA + '44';
+        skelCtx.lineWidth = 8;
+        skelCtx.lineCap = 'round';
+        skelCtx.stroke();
+
+        // Core line
+        skelCtx.beginPath();
+        skelCtx.moveTo(x1, y1); skelCtx.lineTo(x2, y2);
+        skelCtx.strokeStyle = grad;
+        skelCtx.lineWidth = 2.5;
+        skelCtx.stroke();
+      }
+
+      // Draw joint dots
+      for (const idx of DRAW_JOINTS) {
+        if (idx >= landmarks.length) continue;
+        const [cx, cy] = lmPx(landmarks[idx], W, H);
+        if (cx === 0 && cy === 0) continue;
+        const color = JOINT_COLORS[idx] || '#00eaff';
+
+        skelCtx.beginPath();
+        skelCtx.arc(cx, cy, 9, 0, Math.PI * 2);
+        skelCtx.fillStyle = color + '28';
+        skelCtx.fill();
+
+        skelCtx.beginPath();
+        skelCtx.arc(cx, cy, 5.5, 0, Math.PI * 2);
+        skelCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+        skelCtx.lineWidth = 1.8;
+        skelCtx.stroke();
+
+        skelCtx.beginPath();
+        skelCtx.arc(cx, cy, 4, 0, Math.PI * 2);
+        skelCtx.fillStyle = color;
+        skelCtx.fill();
+      }
+    }
+
+    socket.on('skeleton_3d', (data) => {
+      if (data && data.landmarks) {
+        latestLandmarks = data.landmarks;
+        drawSkeleton(latestLandmarks);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (latestLandmarks) drawSkeleton(latestLandmarks);
+    });
+
+    videoImg.addEventListener('load', syncCanvasSize);
+
+    const skelToggleBtn = document.getElementById('skelToggleBtn');
+    skelToggleBtn.addEventListener('click', function () {
+      skelVisible = !skelVisible;
+      this.textContent = skelVisible ? 'SKEL ON' : 'SKEL OFF';
+      this.style.background = skelVisible ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.05)';
+      this.style.color = skelVisible ? 'var(--cyan)' : 'var(--text-muted)';
+      this.style.borderColor = skelVisible ? 'var(--cyan)' : 'rgba(255,255,255,0.2)';
+      if (!skelVisible) skelCtx.clearRect(0, 0, skelCanvas.width, skelCanvas.height);
+      else if (latestLandmarks) drawSkeleton(latestLandmarks);
+    });
+
+  </script>
+</body>
+
+</html>

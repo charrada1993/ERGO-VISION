@@ -151,6 +151,7 @@ class SocketEvents:
         _risk_committed = 'Low'
         # Last good payload angles/anomalies (dropout holdout at emit layer)
         _last_angles   = {}
+        _last_raw_angles = {}
         _last_anomalies = []
 
         while self.running:
@@ -235,6 +236,7 @@ class SocketEvents:
                             if now2 - last_emit >= _min_emit_dt:
                                 self.socketio.emit('pose_update', _sanitize({
                                     'angles':       _last_angles,
+                                    'raw_angles':   _last_raw_angles,
                                     'rula':         _rula_committed,
                                     'reba':         _reba_committed,
                                     'risk_level':   _risk_committed,
@@ -275,8 +277,27 @@ class SocketEvents:
                     # EMA smoothing pass
                     angles = self.skeleton.enrich_with_depth(angles)
 
-                rula_res = self.rula_calc.compute(angles)
-                reba_res = self.reba_calc.compute(angles)
+                # Store raw angles
+                raw_angles = angles.copy()
+
+                # Apply calibration offsets
+                offsets = self.app.config.get('ANGLE_OFFSETS', {})
+                calibrated_angles = {}
+                for k, v in angles.items():
+                    if isinstance(v, (int, float)):
+                        offset = offsets.get(k, 0.0)
+                        calibrated_angles[k] = v - offset
+                    else:
+                        calibrated_angles[k] = v
+
+                # RULA/REBA expect absolute angles, except we reconstruct elbow
+                scoring_angles = calibrated_angles.copy()
+                for k in ['elbow_left', 'elbow_right']:
+                    if k in calibrated_angles:
+                        scoring_angles[k] = calibrated_angles[k] + 180.0
+
+                rula_res = self.rula_calc.compute(scoring_angles)
+                reba_res = self.reba_calc.compute(scoring_angles)
 
                 # ── Score hysteresis ───────────────────────────────────
                 # A score only becomes the "committed" (displayed) value after
@@ -334,7 +355,7 @@ class SocketEvents:
                 if self.ai_model:
                     try:
                         if hasattr(self.ai_model, 'version') and self.ai_model.version == '2.0':
-                            ai_results = self.ai_model.predict(angles)
+                            ai_results = self.ai_model.predict(scoring_angles)
                         else:
                             ai_results = self.ai_model.predict(lm)
                     except Exception as e:
@@ -342,12 +363,12 @@ class SocketEvents:
 
                 # ── 6. Anomaly detection ──────────────────────────────
                 anomalies = []
-                neck_angle  = angles.get('neck', 0)
-                trunk_angle = angles.get('trunk', 0)
-                knee_l = angles.get('knee_left',  0)
-                knee_r = angles.get('knee_right', 0)
-                wrist_l = angles.get('wrist_left', 0)
-                wrist_r = angles.get('wrist_right', 0)
+                neck_angle  = scoring_angles.get('neck', 0)
+                trunk_angle = scoring_angles.get('trunk', 0)
+                knee_l = scoring_angles.get('knee_left',  0)
+                knee_r = scoring_angles.get('knee_right', 0)
+                wrist_l = scoring_angles.get('wrist_left', 0)
+                wrist_r = scoring_angles.get('wrist_right', 0)
                 if neck_angle > 40:
                     anomalies.append(f"Neck forward flexion: {neck_angle:.1f}° (>40°)")
                 elif neck_angle < -15:
@@ -356,8 +377,8 @@ class SocketEvents:
                     anomalies.append(f"Trunk forward lean: {trunk_angle:.1f}° (>60°)")
                 elif trunk_angle < -10:
                     anomalies.append(f"Trunk extension: {trunk_angle:.1f}°")
-                ua_left  = angles.get('upper_arm_left', 0)
-                ua_right = angles.get('upper_arm_right', 0)
+                ua_left  = scoring_angles.get('upper_arm_left', 0)
+                ua_right = scoring_angles.get('upper_arm_right', 0)
                 if ua_left > 90 or ua_right > 90:
                     anomalies.append(f"Shoulder elevated above 90° (L:{ua_left:.0f}° R:{ua_right:.0f}°)")
                 if max(knee_l, knee_r) > 60:
@@ -372,10 +393,12 @@ class SocketEvents:
                 # ── 8. Emit pose_update (throttled to 5 Hz max) ───────
                 now = time.time()
                 if now - last_emit >= _min_emit_dt:
-                    _last_angles   = angles
+                    _last_angles   = calibrated_angles
+                    _last_raw_angles = raw_angles
                     _last_anomalies = anomalies
                     payload = {
-                        'angles':       angles,
+                        'angles':       calibrated_angles,
+                        'raw_angles':   raw_angles,
                         'rula':         _rula_committed,
                         'reba':         _reba_committed,
                         'risk_level':   _risk_committed,
@@ -409,13 +432,13 @@ class SocketEvents:
                     try:
                         if _RiskAnalyzer is not None:
                             vision_anoms = _RiskAnalyzer.detect_anomalies(
-                                angles,
+                                scoring_angles,
                                 rula_res.get('RULA_score', 0),
                                 reba_res.get('REBA_score', 0)
                             )
                         else:
                             vision_anoms = []
-                        self.logger.log(angles, rula_res, reba_res,
+                        self.logger.log(scoring_angles, rula_res, reba_res,
                                         vision_anoms + anomalies, ai_results=ai_results)
                     except Exception:
                         pass   # logging errors are non-critical
@@ -438,13 +461,13 @@ class SocketEvents:
             if imu_mgr is None:
                 return None
             d = imu_mgr.get_data()
-            roll, pitch, yaw = d.get('euler', (0.0, 0.0, 0.0))
+            lat_flex, flex_ext, rotation = d.get('orientation', (0.0, 0.0, 0.0))
             ax, ay, az       = d.get('accel', (0.0, 0.0, 0.0))
             gx, gy, gz       = d.get('gyro',  (0.0, 0.0, 0.0))
             return {
-                'roll':  round(roll,  2),
-                'pitch': round(pitch, 2),
-                'yaw':   round(yaw,   2),
+                'lateral_flexion_estimate': round(lat_flex,  2),
+                'flexion_extension_estimate': round(flex_ext, 2),
+                'rotation_estimate': round(rotation,   2),
                 'accel': {'x': round(ax, 4), 'y': round(ay, 4), 'z': round(az, 4)},
                 'gyro':  {'x': round(gx, 4), 'y': round(gy, 4), 'z': round(gz, 4)},
             }

@@ -189,11 +189,11 @@ Input (12 joint angles) → Dense(512, ReLU) → Dense(256, ReLU) → Dense(128,
 |---|---|
 | 🎥 **OAK-D Depth Camera** | RGB + stereo depth, aligned, post-processed |
 | 🦴 **MediaPipe Pose** | 33 body keypoints, CPU-only, real-time |
-| 📐 **Full RPY Angles** | Pitch, Roll, Yaw computed per joint (neck, trunk, elbow, wrist, thigh) |
+| 📐 **Full Joint Angles** | Flexion, extension, lateral flexion, and rotation computed per joint |
 | 📊 **RULA / REBA** | Official lookup-table scoring, Groups A+B, sub-scores |
 | 🧠 **ErgoNet v2.0** | Angle-based MLP, 97.14% accuracy, 18 MSK condition classes |
-| 📈 **12 Live Sparklines** | Per-joint trend charts with live RPY numeric badges |
-| 🌀 **Visual IMU** | Roll/Pitch/Yaw from Lucas-Kanade optical flow |
+| 📈 **12 Live Sparklines** | Per-joint trend charts with live anatomical movement numeric badges |
+| 🌀 **Visual IMU** | Motion and orientation estimation from Lucas-Kanade optical flow |
 | 🌐 **Socket.IO Dashboard** | Real-time WebSocket streaming to any browser |
 | 🎬 **MJPEG Streams** | Live RGB + depth colourmap at 8 fps over HTTP |
 | 📄 **PDF Reports** | Automated ergonomic risk reports from CSV sessions |
@@ -321,23 +321,23 @@ Open **http://localhost:5000** (or your Jetson IP on port 5000 from any device o
 
 | Key | Description |
 |---|---|
-| `neck` | Neck flexion/extension (Pitch) |
-| `neck_roll` | Head lateral tilt (Roll) |
-| `neck_yaw` | Head left/right rotation (Yaw) |
-| `trunk` | Trunk forward lean (Pitch) |
-| `trunk_roll` | Trunk lateral tilt (Roll) |
-| `trunk_yaw` | Trunk rotation — shoulder vs hip line (Yaw) |
-| `upper_arm_left/right` | Shoulder elevation |
-| `abd_l/r` | Shoulder abduction |
-| `elbow_left/right` | Elbow interior angle |
-| `elb_roll_l/r` | Forearm pronation/supination (Roll) |
-| `wrist_left/right` | Wrist flexion (Pitch) |
-| `wri_roll_l/r` | Wrist radial/ulnar deviation (Roll) |
-| `wri_yaw_l/r` | Wrist twist in transverse plane (Yaw) |
-| `hip_left/right` | Hip flexion |
-| `thi_roll_l/r` | Thigh abduction in frontal plane (Roll) |
-| `thi_yaw_l/r` | Hip internal rotation in horizontal plane (Yaw) |
-| `knee_left/right` | Knee flexion |
+| `neck` | Neck flexion/extension |
+| `neck_lateral_flexion` | Head lateral tilt / flexion |
+| `neck_rotation` | Head rotation |
+| `trunk` | Trunk flexion/extension |
+| `trunk_lateral_flexion` | Trunk lateral flexion |
+| `trunk_rotation` | Trunk rotation |
+| `upper_arm_left/right` | Shoulder flexion/extension |
+| `abd_l/r` | Shoulder abduction/adduction |
+| `elbow_left/right` | Elbow flexion/extension |
+| `elb_rotation_l/r` | Forearm rotation |
+| `wrist_left/right` | Wrist flexion/extension |
+| `wri_deviation_l/r` | Wrist radial/ulnar deviation |
+| `wri_rotation_l/r` | Forearm rotation at the wrist |
+| `hip_left/right` | Hip flexion/extension |
+| `thi_abduction_adduction_l/r` | Thigh abduction/adduction |
+| `thi_rotation_l/r` | Hip rotation |
+| `knee_left/right` | Knee flexion/extension |
 
 ---
 
@@ -354,7 +354,7 @@ Open **http://localhost:5000** (or your Jetson IP on port 5000 from any device o
 **`pose_update` payload:**
 ```json
 {
-  "angles":       {"neck": 12.3, "neck_yaw": -5.1, "trunk": 8.2, ...},
+  "angles":       {"neck": 12.3, "neck_rotation": -5.1, "trunk": 8.2, ...},
   "rula":         4,
   "reba":         7,
   "risk_level":   "Medium",

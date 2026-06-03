@@ -63,6 +63,10 @@ def create_app():
     def ai_page():
         return render_template('ai.html')
 
+    @app.route('/calibration')
+    def calibration_page():
+        return render_template('calibration.html')
+
     # API routes
     @app.route('/api/config')
     def api_config():
@@ -73,6 +77,41 @@ def create_app():
             'imu':    False,
             'has_rv': False,
         })
+
+    @app.route('/api/calibration/save', methods=['POST'])
+    def save_calibration():
+        from flask import request
+        data = request.get_json() or {}
+        offsets = data.get('offsets', {})
+        
+        # Update config
+        app.config['ANGLE_OFFSETS'] = offsets
+        
+        # Save to file
+        import json
+        offsets_file = os.path.join(Config.BASE_DIR, 'data', 'calibration_offsets.json')
+        try:
+            os.makedirs(os.path.dirname(offsets_file), exist_ok=True)
+            with open(offsets_file, 'w') as f:
+                json.dump(offsets, f, indent=4)
+            return jsonify({'status': 'success', 'offsets': offsets})
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    @app.route('/api/calibration/reset', methods=['POST'])
+    def reset_calibration():
+        app.config['ANGLE_OFFSETS'] = {}
+        offsets_file = os.path.join(Config.BASE_DIR, 'data', 'calibration_offsets.json')
+        if os.path.exists(offsets_file):
+            try:
+                os.remove(offsets_file)
+            except Exception:
+                pass
+        return jsonify({'status': 'success'})
+
+    @app.route('/api/calibration/offsets')
+    def get_calibration_offsets():
+        return jsonify({'offsets': app.config.get('ANGLE_OFFSETS', {})})
 
     @app.route('/api/sessions')
     def api_sessions():
