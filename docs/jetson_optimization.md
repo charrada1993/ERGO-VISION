@@ -1,78 +1,78 @@
-# Jetson Orin Optimization: Hardware Tuning Guide
+# Optimisation Jetson Orin : Guide d'ajustement matériel
 
-*Last updated: 2026-05-11*
+*Dernière mise à jour : 2026-05-11*
 
-The ERGO-VISION system is tuned for the **NVIDIA Jetson Orin Nano (reComputer J3011, 8 GB)**. To achieve real-time performance (pose estimation + AI inference + video streaming simultaneously), several hardware and software optimizations are applied.
+Le système ERGO-VISION est optimisé pour le **NVIDIA Jetson Orin Nano (reComputer J3011, 8 Go)**. Pour atteindre des performances en temps réel (estimation de pose + inférence IA + streaming vidéo simultanément), plusieurs optimisations matérielles et logicielles sont appliquées.
 
 ---
 
-## 1. System Environment
+## 1. Environnement système
 
-| Component | Details |
+| Composant | Détails |
 |---|---|
-| **Device** | NVIDIA Jetson Orin Nano (reComputer J3011) |
-| **RAM** | 8 GB LPDDR5 |
+| **Appareil** | NVIDIA Jetson Orin Nano (reComputer J3011) |
+| **RAM** | 8 Go LPDDR5 |
 | **OS** | Ubuntu 22.04 (JetPack 6.x) |
-| **Python** | 3.10 (`oak_env` virtual environment) |
-| **Camera** | OAK-D (USB 3.1 Gen 2) |
+| **Python** | 3.10 (environnement virtuel `oak_env`) |
+| **Caméra** | OAK-D (USB 3.1 Gen 2) |
 
 ---
 
-## 2. Power & Clock Management
+## 2. Gestion de l'alimentation & des horloges
 
 ```bash
-sudo nvpmodel -m 0   # 15W max performance mode
-sudo jetson_clocks   # Pin CPU/GPU to max frequency
+sudo nvpmodel -m 0   # Mode performances maximales 15W
+sudo jetson_clocks   # Verrouiller CPU/GPU à la fréquence maximale
 ```
 
-| Setting | Effect |
+| Paramètre | Effet |
 |---|---|
-| **NVPModel 0** | All CPU cores active, max frequency |
-| **Jetson Clocks** | Eliminates Dynamic Frequency Scaling throttle spikes |
+| **NVPModel 0** | Tous les cœurs CPU actifs, fréquence maximale |
+| **Jetson Clocks** | Élimine les pics de latence causés par la mise à l'échelle dynamique des fréquences |
 
 ---
 
-## 3. Memory Efficiency
+## 3. Efficacité mémoire
 
 ```bash
 export MALLOC_ARENA_MAX=2
 ```
 
-| Optimization | Details |
+| Optimisation | Détails |
 |---|---|
-| `MALLOC_ARENA_MAX=2` | Prevents GLIBC memory arena fragmentation on ARM |
-| ZRAM 4 GB swap | Handles MediaPipe RAM spikes gracefully |
-| NumPy-only AI | ErgoNet v2.0 uses ~15 MB RAM vs. ~2 GB for PyTorch |
+| `MALLOC_ARENA_MAX=2` | Empêche la fragmentation des arènes mémoire GLIBC sur ARM |
+| Swap ZRAM 4 Go | Gère les pics de RAM MediaPipe avec élégance |
+| IA NumPy uniquement | ErgoNet v2.0 utilise ~15 Mo de RAM vs. ~2 Go pour PyTorch |
 
 ---
 
-## 4. AI Inference Speed
+## 4. Vitesse d'inférence IA
 
-ErgoNet v2.0 achieves **< 8 ms** inference latency via:
+ErgoNet v2.0 atteint **< 8 ms** de latence d'inférence via :
 
-- **OpenBLAS** — ARM v8.2 NEON vectorized matrix multiply
-- **Single hidden layer (512)** — minimal matrix sizes
-- **Pre-loaded normalization stats** — zero per-frame overhead at inference
-- **No backpropagation** — operational model does forward pass only
+- **OpenBLAS** — multiplication matricielle vectorisée ARM v8.2 NEON
+- **Couche cachée unique (512)** — tailles de matrices minimales
+- **Statistiques de normalisation pré-chargées** — zéro surcharge par trame à l'inférence
+- **Pas de rétropropagation** — le modèle opérationnel effectue uniquement la passe avant
 
-Full inference pipeline per frame:
+Pipeline d'inférence complet par trame :
 ```
-Angles → Z-score normalize → Forward pass → De-normalize → Socket.IO emit  (~8–12 ms total)
+Angles → Normalisation Z-score → Passe avant → Dénormalisation → Émission Socket.IO  (~8–12 ms total)
 ```
 
 ---
 
-## 5. Camera Pipeline Settings
+## 5. Paramètres du pipeline caméra
 
-| Setting | Value | Reason |
+| Paramètre | Valeur | Raison |
 |---|---|---|
-| `setBlocking(False)` + `setQueueSize(1)` | Non-blocking, size 1 | Prevents pipeline stall; discards stale frames |
-| `tryGetAll()[-1]` | Host side | Always processes the freshest frame |
-| RGB resolution | 1280×720 @ 30 FPS | Balances accuracy and USB bandwidth |
+| `setBlocking(False)` + `setQueueSize(1)` | Non bloquant, taille 1 | Empêche le blocage du pipeline ; élimine les trames périmées |
+| `tryGetAll()[-1]` | Côté hôte | Traite toujours la trame la plus fraîche |
+| Résolution RGB | 1280×720 @ 30 FPS | Équilibre précision et bande passante USB |
 
 ---
 
-## 6. Running the System
+## 6. Lancement du système
 
 ```bash
 source ~/oak_env/bin/activate
@@ -80,11 +80,11 @@ cd ~/ERGO-VISION
 python3 app.py
 ```
 
-For CPU core isolation (optional):
+Pour l'isolation des cœurs CPU (optionnel) :
 ```bash
 taskset -c 0-3 python3 app.py
 ```
 
 ---
 
-*Documented by ErgoVision AI Team · 2026*
+*Documenté par l'Équipe IA ErgoVision · 2026*

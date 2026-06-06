@@ -1,50 +1,50 @@
-# ONNX Export Guide for ErgoNet v2.0
+# Guide d'export ONNX pour ErgoNet v2.0
 
-*Last updated: 2026-05-11*
+*Dernière mise à jour : 2026-05-11*
 
-> **Note:** ErgoNet v2.0 is currently deployed as a **Pure NumPy `.pkl` model** for zero-dependency inference on the Jetson Orin. This guide documents the ONNX pathway for future TensorRT acceleration.
-
----
-
-## What is ONNX?
-
-**ONNX (Open Neural Network Exchange)** is a standardized, open-source format for representing ML models — a "universal translator" for AI. It allows a model trained in one framework (PyTorch, TensorFlow) to be executed in another (ONNX Runtime, TensorRT).
+> **Note :** ErgoNet v2.0 est actuellement déployé comme un **modèle `.pkl` NumPy pur** pour une inférence sans dépendance sur le Jetson Orin. Ce guide documente la voie ONNX pour une accélération TensorRT future.
 
 ---
 
-## Why ONNX for ERGO-VISION?
+## Qu'est-ce qu'ONNX ?
 
-| Reason | Details |
+**ONNX (Open Neural Network Exchange)** est un format open-source standardisé pour représenter les modèles ML — un « traducteur universel » pour l'IA. Il permet à un modèle entraîné dans un framework (PyTorch, TensorFlow) d'être exécuté dans un autre (ONNX Runtime, TensorRT).
+
+---
+
+## Pourquoi ONNX pour ERGO-VISION ?
+
+| Raison | Détails |
 |---|---|
-| **Framework Independence** | Train in PyTorch on a workstation, deploy on Jetson without PyTorch |
-| **TensorRT Bridge** | TensorRT cannot read `.pt` or `.pth` files directly — ONNX is the required intermediate format |
-| **Hardware Acceleration** | ONNX → TensorRT maps model operations directly onto Jetson CUDA cores and DLA |
-| **Portability** | `.onnx` files run on any hardware supported by ONNX Runtime |
+| **Indépendance du framework** | Entraîner en PyTorch sur un poste de travail, déployer sur Jetson sans PyTorch |
+| **Pont TensorRT** | TensorRT ne peut pas lire directement les fichiers `.pt` ou `.pth` — ONNX est le format intermédiaire requis |
+| **Accélération matérielle** | ONNX → TensorRT mappe les opérations du modèle directement sur les cœurs CUDA et DLA Jetson |
+| **Portabilité** | Les fichiers `.onnx` fonctionnent sur tout matériel supporté par ONNX Runtime |
 
 ---
 
-## Current Model: NumPy `.pkl` (Active)
+## Modèle actuel : NumPy `.pkl` (Actif)
 
-ErgoNet v2.0 currently runs as a frozen NumPy model:
+ErgoNet v2.0 fonctionne actuellement comme un modèle NumPy figé :
 
 ```
 ai/models/ergo_net_v2.pkl
 ```
 
-| Property | Value |
+| Propriété | Valeur |
 |---|---|
 | Format | Python pickle (`.pkl`) |
-| Inference | Pure NumPy matrix multiply |
-| Latency | ~8 ms (Jetson CPU) |
-| Dependencies | `numpy` only |
+| Inférence | Multiplication matricielle NumPy pure |
+| Latence | ~8 ms (CPU Jetson) |
+| Dépendances | `numpy` uniquement |
 
 ---
 
-## ONNX Export Pathway (Future)
+## Voie d'export ONNX (Futur)
 
-To export ErgoNet v2.0 to ONNX for TensorRT acceleration:
+Pour exporter ErgoNet v2.0 vers ONNX pour l'accélération TensorRT :
 
-### Step 1: Reconstruct in PyTorch
+### Étape 1 : Reconstruire en PyTorch
 ```python
 import torch
 import torch.nn as nn
@@ -60,7 +60,7 @@ class ErgoNetTorch(nn.Module):
         return self.fc2(self.relu(self.fc1(x)))
 ```
 
-### Step 2: Load Weights from `.pkl`
+### Étape 2 : Charger les poids depuis `.pkl`
 ```python
 import pickle, numpy as np, torch
 
@@ -74,7 +74,7 @@ model.fc2.weight.data = torch.tensor(state['W2'].T, dtype=torch.float32)
 model.fc2.bias.data   = torch.tensor(state['b2'].squeeze(), dtype=torch.float32)
 ```
 
-### Step 3: Export to ONNX
+### Étape 3 : Exporter vers ONNX
 ```python
 dummy_input = torch.randn(1, 12)
 torch.onnx.export(
@@ -86,30 +86,30 @@ torch.onnx.export(
 )
 ```
 
-### Step 4: Compile with TensorRT
+### Étape 4 : Compiler avec TensorRT
 ```bash
 trtexec --onnx=ai/models/ergo_net_v2.onnx \
         --saveEngine=ai/models/ergo_net_v2.engine \
         --fp16
 ```
 
-### Step 5: Run via Operation Script
+### Étape 5 : Exécuter via le script opérationnel
 ```bash
 python3 ai/operation/export_onnx.py
 ```
 
-This will produce `ai/models/ergo_net_v2.onnx`, ready for TensorRT compilation on the Jetson.
+Cela produira `ai/models/ergo_net_v2.onnx`, prêt pour la compilation TensorRT sur le Jetson.
 
 ---
 
-## ONNX Key Parameters
+## Paramètres clés ONNX
 
-| Parameter | Value | Description |
+| Paramètre | Valeur | Description |
 |---|---|---|
-| `input_names` | `['joint_angles']` | 12-element normalized angle vector |
-| `output_names` | 4 diagnostic heads | risk, severity, location, condition |
-| `opset_version` | 17 | Supports all operations in ErgoNet v2.0 |
+| `input_names` | `['joint_angles']` | Vecteur d'angles normalisés à 12 éléments |
+| `output_names` | 4 têtes diagnostiques | risque, sévérité, localisation, condition |
+| `opset_version` | 17 | Supporte toutes les opérations dans ErgoNet v2.0 |
 
 ---
 
-*Documented by ErgoVision AI Team · 2026*
+*Documenté par l'Équipe IA ErgoVision · 2026*

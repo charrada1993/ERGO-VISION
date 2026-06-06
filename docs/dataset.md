@@ -1,110 +1,110 @@
-# Dataset: TMS Enriched Ergonomic Dataset
+# Jeu de données : Jeu de données ergonomique enrichi TMS
 
-*Last updated: 2026-05-11*
+*Dernière mise à jour : 2026-05-11*
 
-ErgoNet v2.0 is trained on the **TMS Enriched Dataset** (`ai/data/dataset_TMS_enriched.csv`), a high-fidelity synthetic ergonomic dataset generated specifically for musculoskeletal disorder (TMS) risk prediction.
+ErgoNet v2.0 est entraîné sur le **Jeu de données TMS Enrichi** (`ai/data/dataset_TMS_enriched.csv`), un jeu de données ergonomique synthétique haute-fidélité généré spécifiquement pour la prédiction du risque de troubles musculosquelettiques (TMS).
 
 ---
 
-## 1. Dataset Overview
+## 1. Aperçu du jeu de données
 
-| Property | Value |
+| Propriété | Valeur |
 |---|---|
-| **File** | `ai/data/dataset_TMS_enriched.csv` |
-| **Size** | ~18.6 MB |
-| **Samples** | 20,000+ unique posture records |
-| **Input Features** | 12 joint angles (bilateral, biomechanical) |
-| **Target Features** | 4 clinical outputs (risk, severity, location, condition) |
+| **Fichier** | `ai/data/dataset_TMS_enriched.csv` |
+| **Taille** | ~18,6 Mo |
+| **Échantillons** | 20 000+ enregistrements de postures uniques |
+| **Caractéristiques d'entrée** | 12 angles articulaires (bilatéraux, biomécaniques) |
+| **Caractéristiques cibles** | 4 sorties cliniques (risque, sévérité, localisation, condition) |
 
 ---
 
-## 2. Input Features (12 Angle Columns)
+## 2. Caractéristiques d'entrée (12 colonnes d'angles)
 
-All angles are in **degrees** and represent real biomechanical joint measurements:
+Tous les angles sont en **degrés** et représentent de vraies mesures d'articulations biomécaniques :
 
-| Column Name | Joint | Range |
+| Nom de colonne | Articulation | Plage |
 |---|---|---|
-| `Neck_Flexion_deg` | Cervical flexion/extension | −10° to +60° |
-| `Trunk_Flexion_deg` | Lumbar forward lean | −10° to +90° |
-| `R_Shoulder_Flexion_deg` | Right shoulder elevation | 0° to 180° |
-| `L_Shoulder_Flexion_deg` | Left shoulder elevation | 0° to 180° |
-| `R_Elbow_Flexion_deg` | Right elbow | 0° to 150° |
-| `L_Elbow_Flexion_deg` | Left elbow | 0° to 150° |
-| `R_Wrist_Deviation_deg` | Right wrist radial/ulnar | −30° to +30° |
-| `L_Wrist_Deviation_deg` | Left wrist radial/ulnar | −30° to +30° |
-| `R_Hip_Flexion_deg` | Right hip | 0° to 120° |
-| `L_Hip_Flexion_deg` | Left hip | 0° to 120° |
-| `R_Knee_Flexion_deg` | Right knee | 0° to 135° |
-| `L_Knee_Flexion_deg` | Left knee | 0° to 135° |
+| `Neck_Flexion_deg` | Flexion/extension cervicale | −10° à +60° |
+| `Trunk_Flexion_deg` | Inclinaison avant lombaire | −10° à +90° |
+| `R_Shoulder_Flexion_deg` | Élévation de l'épaule droite | 0° à 180° |
+| `L_Shoulder_Flexion_deg` | Élévation de l'épaule gauche | 0° à 180° |
+| `R_Elbow_Flexion_deg` | Coude droit | 0° à 150° |
+| `L_Elbow_Flexion_deg` | Coude gauche | 0° à 150° |
+| `R_Wrist_Deviation_deg` | Déviation radiale/ulnaire du poignet droit | −30° à +30° |
+| `L_Wrist_Deviation_deg` | Déviation radiale/ulnaire du poignet gauche | −30° à +30° |
+| `R_Hip_Flexion_deg` | Hanche droite | 0° à 120° |
+| `L_Hip_Flexion_deg` | Hanche gauche | 0° à 120° |
+| `R_Knee_Flexion_deg` | Genou droit | 0° à 135° |
+| `L_Knee_Flexion_deg` | Genou gauche | 0° à 135° |
 
 ---
 
-## 3. Target Features (4 Clinical Labels)
+## 3. Caractéristiques cibles (4 étiquettes cliniques)
 
-| Column Name | Type | Description |
+| Nom de colonne | Type | Description |
 |---|---|---|
-| `risk_score` | Float (0.0–10.0) | Overall ergonomic risk magnitude |
-| `severity_code` | Int (0–4) | Severity: 0=Healthy, 1=Low, 2=Moderate, 3=High, 4=Critical |
-| `location_code` | Int | Anatomical region of highest risk |
-| `condition_code` | Int | TMS condition: Tendinitis, Back Pain, Strain, etc. |
+| `risk_score` | Float (0,0–10,0) | Magnitude globale du risque ergonomique |
+| `severity_code` | Int (0–4) | Sévérité : 0=Sain, 1=Faible, 2=Modéré, 3=Élevé, 4=Critique |
+| `location_code` | Int | Région anatomique à risque le plus élevé |
+| `condition_code` | Int | Condition TMS : Tendinite, Douleur dorsale, Entorse, etc. |
 
 ---
 
-## 4. Synthetic Generation Methodology
+## 4. Méthodologie de génération synthétique
 
-Training-grade ergonomic datasets with precise clinical labels are rarely publicly available. ERGO-VISION uses a **Synthetic Bootstrap** approach via `ai/synthetic_gen.py`.
+Les jeux de données ergonomiques de qualité d'entraînement avec des étiquettes cliniques précises sont rarement disponibles publiquement. ERGO-VISION utilise une approche **Bootstrap Synthétique** via `ai/synthetic_gen.py`.
 
-### A. Random Motion Sampling
-The simulator samples random joint angles within anatomically valid ranges:
-- **Neck**: Flexion/Extension (−10° to +60°), Lateral (±35°).
-- **Trunk**: Flexion (−10° to +90°).
-- **Shoulders**: Abduction/Flexion (0° to 180°).
-- **Elbows**: Flexion (0° to 150°).
-- **Wrists**: Deviation (±30°).
-- **Hips/Knees**: Physiological range.
+### A. Échantillonnage aléatoire de mouvement
+Le simulateur échantillonne des angles articulaires aléatoires dans des plages anatomiquement valides :
+- **Cou** : Flexion/Extension (−10° à +60°), Latéral (±35°).
+- **Tronc** : Flexion (−10° à +90°).
+- **Épaules** : Abduction/Flexion (0° à 180°).
+- **Coudes** : Flexion (0° à 150°).
+- **Poignets** : Déviation (±30°).
+- **Hanches/Genoux** : Plage physiologique.
 
-### B. Landmark Projection
-For each angle set, the system computes the **3D XYZ coordinates** of all 33 MediaPipe landmarks, creating a perfect ground truth that links landmark geometry to precise angle values.
+### B. Projection de landmarks
+Pour chaque ensemble d'angles, le système calcule les **coordonnées XYZ 3D** de tous les 33 landmarks MediaPipe, créant une vérité terrain parfaite qui relie la géométrie des landmarks aux valeurs d'angles précises.
 
-### C. Automatic RULA/REBA Labeling
-Every generated posture is passed through the **official angle-based RULA/REBA scoring engine** to assign clinical scores (devoid of subjective load/effort metrics). The AI then learns: *"When I see these angles, the risk state is X."*
+### C. Étiquetage automatique RULA/REBA
+Chaque posture générée est passée à travers le **moteur de scoring RULA/REBA officiel basé sur les angles** pour attribuer des scores cliniques (sans métriques de charge/effort subjectifs). L'IA apprend ensuite : *« Quand je vois ces angles, l'état de risque est X. »*
 
-### D. TMS Enrichment
-The dataset is additionally enriched with **condition-specific patterns**:
-- Over-represented high-risk postures (RULA 5+) to improve sensitivity.
-- Bilateral asymmetry patterns (left/right imbalance) associated with real-world TMS development.
-- Repetitive micro-posture variations to improve generalization.
+### D. Enrichissement TMS
+Le jeu de données est enrichi avec des **patterns spécifiques aux conditions** :
+- Surreprésentation des postures à haut risque (RULA 5+) pour améliorer la sensibilité.
+- Patterns d'asymétrie bilatérale (déséquilibre gauche/droite) associés au développement réel de TMS.
+- Micro-variations répétitives de postures pour améliorer la généralisation.
 
 ---
 
-## 5. Advantages of Synthetic Data
+## 5. Avantages des données synthétiques
 
-| Advantage | Details |
+| Avantage | Détails |
 |---|---|
-| **No Manual Labeling** | No need for a clinician to grade thousands of images |
-| **Extreme Coverage** | Can generate postures too painful for humans to hold during data collection |
-| **Zero Label Error** | Labels are computed from math — no human annotation mistakes |
-| **Controllable Distribution** | Can over-sample rare high-risk conditions as needed |
-| **Privacy Compliant** | No real patient or worker data involved |
+| **Pas d'annotation manuelle** | Aucun clinicien n'est nécessaire pour évaluer des milliers d'images |
+| **Couverture extrême** | Peut générer des postures trop douloureuses pour les humains lors de la collecte de données |
+| **Zéro erreur d'étiquette** | Les étiquettes sont calculées mathématiquement — aucune erreur d'annotation humaine |
+| **Distribution contrôlable** | Peut suréchantillonner les conditions rares à haut risque selon les besoins |
+| **Conforme à la vie privée** | Aucune donnée réelle de patient ou de travailleur impliquée |
 
 ---
 
-## 6. Preprocessing in Training
+## 6. Prétraitement à l'entraînement
 
-Before training, the following normalization is applied:
+Avant l'entraînement, la normalisation suivante est appliquée :
 
 ```python
-# Input normalization (Z-score)
+# Normalisation des entrées (Z-score)
 X_mean, X_std = X.mean(axis=0), X.std(axis=0) + 1e-6
 X_norm = (X - X_mean) / X_std
 
-# Output normalization (Z-score)
+# Normalisation des sorties (Z-score)
 y_mean, y_std = y.mean(axis=0), y.std(axis=0) + 1e-6
 y_norm = (y - y_mean) / y_std
 ```
 
-The `X_mean`, `X_std`, `y_mean`, and `y_std` statistics are saved inside the model `.pkl` file and applied identically at inference time.
+Les statistiques `X_mean`, `X_std`, `y_mean` et `y_std` sont sauvegardées dans le fichier modèle `.pkl` et appliquées de façon identique au moment de l'inférence.
 
 ---
 
-*Documented by ErgoVision AI Team · 2026*
+*Documenté par l'Équipe IA ErgoVision · 2026*

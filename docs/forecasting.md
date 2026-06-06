@@ -1,95 +1,95 @@
-# Temporal Forecasting: 10-Day Risk Prediction
+# Prévision temporelle : Prédiction de risque sur 10 jours
 
-*Last updated: 2026-05-11*
+*Dernière mise à jour : 2026-05-11*
 
-One of the most advanced features of the ERGO-VISION AI is its ability to **predict future ergonomic risks** based on a worker's historical posture data. This module operates on top of ErgoNet v2.0's live `risk_score` output and extends it forward in time using temporal pattern analysis.
+L'une des fonctionnalités les plus avancées de l'IA ERGO-VISION est sa capacité à **prédire les risques ergonomiques futurs** basés sur les données de posture historiques d'un travailleur. Ce module fonctionne sur la sortie `risk_score` en direct d'ErgoNet v2.0 et l'étend dans le temps à l'aide d'une analyse de patterns temporels.
 
 ---
 
-## 1. Overview
+## 1. Aperçu
 
-| Property | Value |
+| Propriété | Valeur |
 |---|---|
-| **Method** | Temporal Moving Window (TMW) + LSTM projection |
-| **Input Window** | Last 7 days of session logs |
-| **Forecast Horizon** | 10 days |
-| **Data Source** | `ai/data/training_log.json` + live `risk_score` stream |
+| **Méthode** | Fenêtre Mobile Temporelle (TMW) + projection LSTM |
+| **Fenêtre d'entrée** | 7 derniers jours de journaux de session |
+| **Horizon de prévision** | 10 jours |
+| **Source de données** | `ai/data/training_log.json` + flux `risk_score` en direct |
 
 ---
 
-## 2. The Time-Series Logic
+## 2. La logique des séries temporelles
 
-The forecaster does not look at a single snapshot. It analyzes the **trend trajectory** of risk accumulation across multiple work sessions.
+Le prévisionneur ne regarde pas un seul instantané. Il analyse la **trajectoire de tendance** de l'accumulation de risques sur plusieurs sessions de travail.
 
-### Feature Extraction (7-Day Window)
+### Extraction de caractéristiques (Fenêtre de 7 jours)
 
-The model processes three key signals from session history:
+Le modèle traite trois signaux clés de l'historique des sessions :
 
 | Signal | Description |
 |---|---|
-| **Cumulative Load** | Total time spent in high-risk zones (RULA 5+, risk_score > 7.0) per day |
-| **Static Fatigue Index** | Duration any single joint stays in a high-flexion state without movement (a primary TMS risk factor) |
-| **Diurnal Variance** | Time-of-day risk distribution — e.g., does the worker's posture consistently worsen after 3:00 PM? |
+| **Charge cumulée** | Temps total passé en zones à haut risque (RULA 5+, risk_score > 7,0) par jour |
+| **Indice de fatigue statique** | Durée pendant laquelle une seule articulation reste en état de haute flexion sans mouvement (un facteur de risque TMS primaire) |
+| **Variance diurne** | Distribution du risque selon l'heure de la journée — ex., la posture du travailleur se dégrade-t-elle systématiquement après 15h00 ? |
 
 ---
 
-## 3. 10-Day Projection (LSTM)
+## 3. Projection sur 10 jours (LSTM)
 
-The forecasting engine fits a **growth/decay curve** to the 7-day history and projects it 10 days forward.
+Le moteur de prévision ajuste une **courbe de croissance/décroissance** sur l'historique de 7 jours et la projette 10 jours en avant.
 
-### Growth Phase
-If the AI detects an upward trend (e.g., `Neck_Flexion` risk increasing by 5% per day), it extrapolates:
-- **Day 3–4 prediction**: Severity escalates to `HIGH` (severity_code = 3).
-- **Day 7 prediction**: `CRITICAL` threshold reached (severity_code = 4) unless intervention occurs.
+### Phase de croissance
+Si l'IA détecte une tendance à la hausse (ex., risque `Neck_Flexion` augmentant de 5 % par jour) :
+- **Prédiction jours 3–4** : La sévérité passe à `ÉLEVÉ` (severity_code = 3).
+- **Prédiction jour 7** : Seuil `CRITIQUE` atteint (severity_code = 4) sans intervention.
 
-### Decay Phase
-If the worker has taken corrective action (posture improved, lower risk readings this week):
-- The model predicts **risk reduction** and marks the trend as improving.
-- A "Recovery Trajectory" badge is shown on the dashboard.
+### Phase de décroissance
+Si le travailleur a pris des mesures correctives (posture améliorée, lectures de risque plus faibles cette semaine) :
+- Le modèle prédit une **réduction du risque** et marque la tendance comme s'améliorant.
+- Un badge « Trajectoire de récupération » est affiché sur le tableau de bord.
 
-### Anomaly Forecasting
-Beyond trend projection, the model identifies **upcoming anomaly types** based on repetitive patterns:
-- Repeated extreme wrist deviation → predicts high `condition_code` for Carpal Tunnel / Tendinitis.
-- Prolonged unilateral shoulder elevation → predicts Rotator Cuff risk on the dominant side.
+### Prévision d'anomalies
+Au-delà de la projection de tendance, le modèle identifie les **types d'anomalies à venir** basés sur les patterns répétitifs :
+- Déviation extrême répétée du poignet → prédit un `condition_code` élevé pour Canal Carpien / Tendinite.
+- Élévation unilatérale prolongée de l'épaule → prédit un risque de Coiffe des Rotateurs du côté dominant.
 
 ---
 
-## 4. Preventive Action Framework
+## 4. Cadre d'action préventive
 
-The goal of 10-day forecasting is to **change the future**. The dashboard presents:
+L'objectif de la prévision sur 10 jours est de **changer l'avenir**. Le tableau de bord présente :
 
-| Forecast Indicator | Action |
+| Indicateur de prévision | Action |
 |---|---|
-| 🟢 **Improving** | No action required — continue current habits |
-| 🟡 **Stable / Monitoring** | Check joint loading patterns this week |
-| 🔶 **Increasing Risk** | Ergonomic workstation adjustment recommended |
-| 🔴 **High-Risk Trajectory** | Immediate intervention: physiotherapy referral suggested |
+| 🟢 **En amélioration** | Aucune action requise — continuer les habitudes actuelles |
+| 🟡 **Stable / Surveillance** | Vérifier les patterns de charge articulaire cette semaine |
+| 🔶 **Risque croissant** | Ajustement ergonomique du poste de travail recommandé |
+| 🔴 **Trajectoire à haut risque** | Intervention immédiate : référence en physiothérapie suggérée |
 
-By seeing a "High Risk" prediction for next Tuesday, a worker or ergonomist can adjust monitor height, chair settings, or task rotation **before the injury develops**.
-
----
-
-## 5. Data Flow
-
-```
-Live Session (Socket.IO)
-        │
-        ▼
-ErgoNet v2.0 → risk_score (0.0–10.0)
-        │
-        ▼
-Session Logger (CSV) → daily aggregation
-        │
-        ▼
-7-Day Window Extractor → feature vector
-        │
-        ▼
-LSTM / TMW Projector → 10-day forecast
-        │
-        ▼
-Dashboard /ai page → visual forecast chart
-```
+En voyant une prédiction « Haut risque » pour mardi prochain, un travailleur ou un ergonome peut ajuster la hauteur du moniteur, les réglages de la chaise ou la rotation des tâches **avant que la blessure ne se développe**.
 
 ---
 
-*Documented by ErgoVision AI Team · 2026*
+## 5. Flux de données
+
+```
+Session en direct (Socket.IO)
+        │
+        ▼
+ErgoNet v2.0 → risk_score (0,0–10,0)
+        │
+        ▼
+Journaliseur de session (CSV) → agrégation quotidienne
+        │
+        ▼
+Extracteur de fenêtre 7 jours → vecteur de caractéristiques
+        │
+        ▼
+Projecteur LSTM / TMW → prévision 10 jours
+        │
+        ▼
+Tableau de bord page /ai → graphique de prévision visuel
+```
+
+---
+
+*Documenté par l'Équipe IA ErgoVision · 2026*

@@ -1,85 +1,85 @@
-# AI Architecture: ErgoNet v2.0 Deep Dive
+# Architecture IA : Analyse approfondie d'ErgoNet v2.0
 
-*Last updated: 2026-05-11*
+*Dernière mise à jour : 2026-05-11*
 
-**ErgoNet v2.0** is the active inference engine powering the ERGO-VISION real-time ergonomic pipeline. It is a custom-built Neural Network implemented in **Pure NumPy**, designed to operate on the **NVIDIA Jetson Orin Nano (reComputer J3011)** without requiring PyTorch, TensorFlow, or Keras.
-
----
-
-## 1. Design Philosophy
-
-Unlike standard pose-estimation models that output joint coordinates, ErgoNet v2.0 is a **Multi-Task Regression MLP**. A single forward pass simultaneously produces four clinical diagnostic outputs. This is more efficient than running four separate models and captures the cross-joint ergonomic relationships in a shared representation.
-
-### Why Pure NumPy?
-- **No Library Bloat**: Avoids the ~2 GB RAM overhead of PyTorch/TensorFlow at startup.
-- **ARM64 Optimized**: Leverages Jetson's **OpenBLAS with ARM v8.2 NEON** instructions for vectorized matrix multiplication.
-- **Inference Latency**: Single forward pass completes in **< 8 ms** on Jetson CPU.
-- **Portable**: The frozen `.pkl` model file works on any Python 3.10+ environment — no CUDA required.
+**ErgoNet v2.0** est le moteur d'inférence actif alimentant le pipeline ergonomique en temps réel d'ERGO-VISION. C'est un réseau de neurones personnalisé implémenté en **NumPy pur**, conçu pour fonctionner sur le **NVIDIA Jetson Orin Nano (reComputer J3011)** sans nécessiter PyTorch, TensorFlow ou Keras.
 
 ---
 
-## 2. Network Topology
+## 1. Philosophie de conception
+
+Contrairement aux modèles d'estimation de pose standard qui produisent des coordonnées articulaires, ErgoNet v2.0 est un **MLP de régression multi-tâches**. Une seule passe avant produit simultanément quatre sorties diagnostiques cliniques. C'est plus efficace que d'exécuter quatre modèles séparés et capture les relations ergonomiques inter-articulaires dans une représentation partagée.
+
+### Pourquoi NumPy pur ?
+- **Pas de surcouche de bibliothèques** : Évite la surcharge ~2 Go de RAM de PyTorch/TensorFlow au démarrage.
+- **Optimisé ARM64** : Exploite les instructions **OpenBLAS avec ARM v8.2 NEON** de Jetson pour la multiplication matricielle vectorisée.
+- **Latence d'inférence** : Une seule passe avant se termine en **< 8 ms** sur le CPU Jetson.
+- **Portable** : Le fichier modèle `.pkl` figé fonctionne dans n'importe quel environnement Python 3.10+ — sans CUDA requis.
+
+---
+
+## 2. Topologie du réseau
 
 ```
-Input (12)  →  Hidden (512, ReLU)  →  Output (4)
+Entrée (12)  →  Cachée (512, ReLU)  →  Sortie (4)
 ```
 
-| Layer | Shape | Activation |
+| Couche | Forme | Activation |
 |---|---|---|
-| Input | `(N, 12)` | — (Z-score normalized angles) |
-| Hidden | `(12 → 512)` | ReLU |
-| Output | `(512 → 4)` | Linear (regression) |
+| Entrée | `(N, 12)` | — (angles normalisés Z-score) |
+| Cachée | `(12 → 512)` | ReLU |
+| Sortie | `(512 → 4)` | Linéaire (régression) |
 
-### Weight Initialization
-Xavier (Glorot) initialization is used to maintain variance across layers:
+### Initialisation des poids
+L'initialisation Xavier (Glorot) est utilisée pour maintenir la variance entre les couches :
 ```python
 W1 = np.random.randn(12, 512) * np.sqrt(1.0 / 12)
 W2 = np.random.randn(512, 4)  * np.sqrt(1.0 / 512)
 ```
-This prevents gradient vanishing/explosion and ensures the model converges cleanly on the Jetson.
+Cela empêche la disparition/explosion du gradient et assure une convergence propre sur le Jetson.
 
 ---
 
-## 3. Input: 12 Biomechanical Joint Angles
+## 3. Entrée : 12 angles articulaires biomécaniques
 
-ErgoNet v2.0 moved from raw MediaPipe landmark coordinates (x, y, z) to **computed joint angles**. This is the key improvement over v1.0:
+ErgoNet v2.0 est passé des coordonnées de landmarks MediaPipe brutes (x, y, z) aux **angles articulaires calculés**. C'est l'amélioration clé par rapport à v1.0 :
 
-| Input Feature | Joint |
+| Caractéristique d'entrée | Articulation |
 |---|---|
-| `Neck_Flexion_deg` | Cervical spine forward/backward tilt |
-| `Trunk_Flexion_deg` | Lumbar spine forward lean |
-| `R_Shoulder_Flexion_deg` | Right shoulder elevation |
-| `L_Shoulder_Flexion_deg` | Left shoulder elevation |
-| `R_Elbow_Flexion_deg` | Right elbow angle |
-| `L_Elbow_Flexion_deg` | Left elbow angle |
-| `R_Wrist_Deviation_deg` | Right wrist radial/ulnar deviation |
-| `L_Wrist_Deviation_deg` | Left wrist radial/ulnar deviation |
-| `R_Hip_Flexion_deg` | Right hip flexion |
-| `L_Hip_Flexion_deg` | Left hip flexion |
-| `R_Knee_Flexion_deg` | Right knee angle |
-| `L_Knee_Flexion_deg` | Left knee angle |
+| `Neck_Flexion_deg` | Inclinaison avant/arrière de la colonne cervicale |
+| `Trunk_Flexion_deg` | Inclinaison avant lombaire |
+| `R_Shoulder_Flexion_deg` | Élévation de l'épaule droite |
+| `L_Shoulder_Flexion_deg` | Élévation de l'épaule gauche |
+| `R_Elbow_Flexion_deg` | Angle du coude droit |
+| `L_Elbow_Flexion_deg` | Angle du coude gauche |
+| `R_Wrist_Deviation_deg` | Déviation radiale/ulnaire du poignet droit |
+| `L_Wrist_Deviation_deg` | Déviation radiale/ulnaire du poignet gauche |
+| `R_Hip_Flexion_deg` | Flexion de la hanche droite |
+| `L_Hip_Flexion_deg` | Flexion de la hanche gauche |
+| `R_Knee_Flexion_deg` | Angle du genou droit |
+| `L_Knee_Flexion_deg` | Angle du genou gauche |
 
-**Why angles instead of raw landmarks?**
-Raw landmark coordinates (x, y, z) change based on camera distance and perspective. A person standing 1 m away produces entirely different x/y values than the same person at 3 m. Angles are **scale-invariant and perspective-invariant**, making ErgoNet v2.0 significantly more robust in real-world industrial deployments.
+**Pourquoi les angles plutôt que les landmarks bruts ?**
+Les coordonnées de landmarks brutes (x, y, z) changent en fonction de la distance de la caméra et de la perspective. Les angles sont **invariants à l'échelle et à la perspective**, rendant ErgoNet v2.0 significativement plus robuste dans les déploiements industriels réels.
 
 ---
 
-## 4. Output: 4 Diagnostic Heads
+## 4. Sortie : 4 têtes diagnostiques
 
-| Head | Type | Description |
+| Tête | Type | Description |
 |---|---|---|
-| `risk_score` | Continuous (0.0–10.0) | Overall ergonomic risk magnitude |
-| `severity_code` | Categorical int | 0=Healthy, 1=Low, 2=Moderate, 3=High, 4=Critical |
-| `location_code` | Categorical int | Anatomical segment with highest risk |
-| `condition_code` | Categorical int | Predicted TMS condition (Tendinitis, Strain, etc.) |
+| `risk_score` | Continu (0,0–10,0) | Magnitude globale du risque ergonomique |
+| `severity_code` | Int catégoriel | 0=Sain, 1=Faible, 2=Modéré, 3=Élevé, 4=Critique |
+| `location_code` | Int catégoriel | Segment anatomique à risque le plus élevé |
+| `condition_code` | Int catégoriel | Condition TMS prédite (Tendinite, Entorse, etc.) |
 
 ---
 
-## 5. Forward Pass
+## 5. Passe avant
 
 ```python
 def forward(self, X):
-    self.z1 = np.dot(X, self.W1) + self.b1   # Linear transform
+    self.z1 = np.dot(X, self.W1) + self.b1   # Transformation linéaire
     self.a1 = np.maximum(0, self.z1)           # ReLU
     self.z2 = np.dot(self.a1, self.W2) + self.b2
     return self.z2
@@ -87,26 +87,26 @@ def forward(self, X):
 
 ---
 
-## 6. Training Summary
+## 6. Résumé de l'entraînement
 
-| Parameter | Value |
+| Paramètre | Valeur |
 |---|---|
-| Dataset | `dataset_TMS_enriched.csv` (~20,000 samples) |
-| Epochs | 500 |
-| Learning Rate | 0.005 |
-| Loss Function | Mean Squared Error (MSE) |
-| Final Training Loss | **0.2742** |
-| Final Training Accuracy | **97.14%** |
-| Final Validation Accuracy | **94.22%** |
+| Jeu de données | `dataset_TMS_enriched.csv` (~20 000 échantillons) |
+| Époques | 500 |
+| Taux d'apprentissage | 0,005 |
+| Fonction de perte | Erreur Quadratique Moyenne (MSE) |
+| Perte finale d'entraînement | **0,2742** |
+| Précision finale d'entraînement | **97,14 %** |
+| Précision finale de validation | **94,22 %** |
 
 ---
 
-## 7. Activation & Mathematical Stability
+## 7. Activation & Stabilité mathématique
 
-- **ReLU**: Enables the network to learn non-linear ergonomic decision boundaries (e.g., "risk increases non-linearly past 45° shoulder abduction").
-- **Z-score Normalization**: Both inputs and outputs are normalized before training and de-normalized at inference, preventing large-gradient instability across the 4 output heads.
-- **Feature Normalization at Inference**: Stored `X_mean` and `X_std` from training are applied to live camera data, ensuring the inference distribution matches the training distribution.
+- **ReLU** : Permet au réseau d'apprendre des frontières de décision ergonomiques non linéaires.
+- **Normalisation Z-score** : Les entrées et sorties sont normalisées avant l'entraînement et dénormalisées à l'inférence.
+- **Normalisation des caractéristiques à l'inférence** : Les statistiques `X_mean` et `X_std` stockées depuis l'entraînement sont appliquées aux données de caméra en direct.
 
 ---
 
-*Documented by ErgoVision AI Team · 2026*
+*Documenté par l'Équipe IA ErgoVision · 2026*
